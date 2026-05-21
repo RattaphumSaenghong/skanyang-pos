@@ -1,0 +1,315 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Shop {
+  id                       String   @id @default(cuid())
+  name                     String
+  address                  String?
+  phone                    String?
+  active                   Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  activeDisplayQuotationId String?
+
+  users          User[]
+  stockItems     StockItem[]
+  sales          Sale[]
+  quotations     Quotation[]
+  customers      Customer[]
+  stockMovements StockMovement[]
+  displayImages  DisplayImage[]
+  stockSnapshots StockSnapshot[]
+  ipWhitelist    IpWhitelist[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  shop         Shop?     @relation(fields: [shopId], references: [id])
+  shopId       String?
+  username     String    @unique
+  displayName  String
+  passwordHash String
+  role         Role      @default(STAFF)
+  active       Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+
+  quotations Quotation[]
+  sales      Sale[]
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  sku            String   @unique
+  brand          String
+  model          String
+  sizeWidth      Int
+  sizeSeries     Int
+  sizeRim        Int
+  sizeNormalized String
+  sizeRaw        String
+  isSetPricing   Boolean  @default(false)
+  dotYear        String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  priceEntries   PriceEntry[]
+  stockItems     StockItem[]
+  quotationItems QuotationItem[]
+  saleItems      SaleItem[]
+}
+
+model PriceList {
+  id         String   @id @default(cuid())
+  name       String
+  month      Int
+  year       Int
+  importedAt DateTime @default(now())
+  fileUrl    String?
+  isActive   Boolean  @default(false)
+  importedBy String
+
+  entries PriceEntry[]
+}
+
+model PriceEntry {
+  id          String    @id @default(cuid())
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  priceListId String
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String
+
+  costNormal   Float
+  costPromo    Float?
+  priceListed  Float
+  priceCash    Float
+  priceCard    Float
+  priceZeroPct Float
+  priceBulk    Float
+  marketArp    Float?
+  discTradeIn  Float  @default(0)
+  discCard     Float  @default(0)
+  discCash     Float  @default(0)
+  discPromo    Float  @default(0)
+  marginCash   Float?
+  marginBulk   Float?
+
+  @@unique([priceListId, productId])
+}
+
+model StockItem {
+  id             String   @id @default(cuid())
+  shop           Shop     @relation(fields: [shopId], references: [id])
+  shopId         String
+  product        Product  @relation(fields: [productId], references: [id])
+  productId      String
+  qtyOnHand      Int      @default(0)
+  qtyReserved    Int      @default(0)
+  alertThreshold Int      @default(4)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([shopId, productId])
+}
+
+model StockMovement {
+  id          String       @id @default(cuid())
+  shop        Shop         @relation(fields: [shopId], references: [id])
+  shopId      String
+  productId   String
+  type        MovementType
+  qty         Int
+  referenceId String?
+  note        String?
+  createdBy   String
+  createdAt   DateTime     @default(now())
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUST
+  RETURN
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  shop         Shop     @relation(fields: [shopId], references: [id])
+  shopId       String
+  name         String
+  phone        String?
+  plateNumber  String?
+  vehicleModel String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  quotations Quotation[]
+  sales      Sale[]
+}
+
+model Quotation {
+  id          String          @id @default(cuid())
+  shop        Shop            @relation(fields: [shopId], references: [id])
+  shopId      String
+  customer    Customer?       @relation(fields: [customerId], references: [id])
+  customerId  String?
+  priceListId String
+  status      QuotationStatus @default(DRAFT)
+  date        DateTime        @default(now())
+  validUntil  DateTime?
+  plateNumber String?
+  sizeNote    String?
+  promoNote   String?
+  notes       String?
+  pdfUrl      String?
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime        @default(now())
+
+  items QuotationItem[]
+  sales Sale[]
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  EXPIRED
+  CONVERTED
+}
+
+model QuotationItem {
+  id           String    @id @default(cuid())
+  quotation    Quotation @relation(fields: [quotationId], references: [id])
+  quotationId  String
+  product      Product   @relation(fields: [productId], references: [id])
+  productId    String
+  priceEntryId String
+  qty          Int
+  isSetPricing Boolean   @default(false)
+
+  unitPriceCash    Float
+  unitPriceCard    Float
+  unitPriceZeroPct Float
+  priceOverride    Boolean @default(false)
+  overrideNote     String?
+}
+
+model Sale {
+  id             String        @id @default(cuid())
+  shop           Shop          @relation(fields: [shopId], references: [id])
+  shopId         String
+  quotation      Quotation?    @relation(fields: [quotationId], references: [id])
+  quotationId    String?
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  customerId     String?
+  paymentMethod  PaymentMethod
+  totalAmount    Float
+  totalCost      Float
+  grossProfit    Float
+  flag           SaleFlag      @default(NORMAL)
+  flagApprovedBy String?
+  flagApprovedAt DateTime?
+  servedBy       User          @relation(fields: [servedById], references: [id])
+  servedById     String
+  createdAt      DateTime      @default(now())
+
+  items SaleItem[]
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ZERO_PCT
+  TRANSFER
+}
+
+enum SaleFlag {
+  NORMAL
+  BELOW_COST
+  APPROVED
+  SPECIAL
+}
+
+enum AuditEvent {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+}
+
+model SaleItem {
+  id              String  @id @default(cuid())
+  sale            Sale    @relation(fields: [saleId], references: [id])
+  saleId          String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
+  qty             Int
+  unitCost        Float
+  unitPrice       Float
+  discountApplied Float   @default(0)
+  subtotal        Float
+  profit          Float
+}
+
+model StockSnapshot {
+  id       String   @id @default(cuid())
+  shop     Shop     @relation(fields: [shopId], references: [id])
+  shopId   String
+  takenAt  DateTime @default(now())
+  takenBy  String
+  label    String?
+  archived Boolean  @default(false)
+
+  entries StockSnapshotEntry[]
+}
+
+model StockSnapshotEntry {
+  id             String        @id @default(cuid())
+  snapshot       StockSnapshot @relation(fields: [snapshotId], references: [id])
+  snapshotId     String
+  productId      String
+  sku            String
+  sizeNormalized String
+  qtyActual      Int
+  qtySystem      Int
+}
+
+model DisplayImage {
+  id        String   @id @default(cuid())
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  shopId    String
+  url       String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model IpWhitelist {
+  id        String   @id @default(cuid())
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  shopId    String
+  ipAddress String
+  label     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String     @id @default(cuid())
+  userId    String?
+  username  String
+  event     AuditEvent
+  ip        String
+  userAgent String?
+  success   Boolean
+  createdAt DateTime   @default(now())
+}
