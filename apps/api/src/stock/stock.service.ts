@@ -30,7 +30,7 @@ export class StockService {
       update: { qtyOnHand: { increment: qty } },
     });
     await this.prisma.stockMovement.create({
-      data: { shopId, productId, type: MovementType.ADJUST, qty, note, createdBy: userId },
+      data: { shopId, productId, type: qty > 0 ? MovementType.IN : MovementType.ADJUST, qty, note, createdBy: userId },
     });
     return item;
   }

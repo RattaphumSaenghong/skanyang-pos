@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { QuotationsService } from './quotations.service';
+import { CreateQuotationDto } from './dto/create-quotation.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('quotations')
@@ -9,9 +10,9 @@ export class QuotationsController {
   constructor(private service: QuotationsService) {}
 
   @Post()
-  create(@Body() body: any, @CurrentUser() user: any) {
+  create(@Body() body: CreateQuotationDto, @CurrentUser() user: any) {
     // OWNER (shopId=null) may specify a shopId; STAFF is locked to their own shop
-    const shopId = user.role === 'OWNER' ? (body.shopId ?? user.shopId) : user.shopId;
+    const shopId = user.role === 'OWNER' ? ((body as any).shopId ?? user.shopId) : user.shopId;
     return this.service.create(body, user.id, shopId);
   }
 

@@ -113,14 +113,35 @@ export default function PosSearchPage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center">
-                      <input
-                        type="number"
-                        min={0}
-                        max={99}
-                        className="w-16 border rounded px-2 py-1 text-center text-sm"
-                        value={qty[e.id] ?? ''}
-                        onChange={(ev) => setQty((q) => ({ ...q, [e.id]: parseInt(ev.target.value) || 0 }))}
-                      />
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          disabled={!qty[e.id] || qty[e.id] <= 4}
+                          onClick={() =>
+                            setQty((q) => {
+                              const next = (q[e.id] ?? 0) - 4;
+                              if (next <= 0) {
+                                const { [e.id]: _, ...rest } = q;
+                                return rest;
+                              }
+                              return { ...q, [e.id]: next };
+                            })
+                          }
+                          className="w-7 h-7 border rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm tabular-nums">
+                          {qty[e.id] ?? 0}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setQty((q) => ({ ...q, [e.id]: (q[e.id] ?? 0) + 4 }))
+                          }
+                          className="w-7 h-7 border rounded text-sm font-medium hover:bg-gray-100"
+                        >
+                          +
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

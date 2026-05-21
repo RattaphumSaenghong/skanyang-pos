@@ -1,8 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { StockService } from './stock.service';
 
@@ -23,12 +20,10 @@ export class StockController {
     return this.service.movements(user.shopId);
   }
 
-  @Roles(Role.OWNER)
-  @UseGuards(RolesGuard)
   @Post('adjust')
   adjust(@Body() body: any, @CurrentUser() user: any) {
-    // OWNER may adjust any shop; body.shopId required
+    // OWNER may adjust any shop; STAFF is locked to their own shop
     const shopId = user.role === 'OWNER' ? body.shopId : user.shopId;
-    return this.service.adjust(shopId, body.productId, body.qty, body.note, user.id);
+    return this.service.adjust(shopId, body.productId, body.qty, body.note ?? '', user.id);
   }
 }

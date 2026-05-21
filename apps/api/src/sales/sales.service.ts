@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentMethod } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 
@@ -36,6 +36,9 @@ export class SalesService {
       }),
     );
 
+    const isBelowCost = saleItems.some(i => i.unitPrice < i.unitCost);
+    const flag = isBelowCost ? 'BELOW_COST' : 'NORMAL';
+
     const totalAmount = saleItems.reduce((s, i) => s + i.subtotal, 0);
     const totalCost = saleItems.reduce((s, i) => s + i.unitCost * i.qty, 0);
     const grossProfit = totalAmount - totalCost;
@@ -49,6 +52,7 @@ export class SalesService {
         totalAmount,
         totalCost,
         grossProfit,
+        flag,
         servedById: userId,
         items: { create: saleItems },
       },
@@ -79,6 +83,68 @@ export class SalesService {
     await this.prisma.quotation.update({
       where: { id: quotationId },
       data: { status: 'CONVERTED' },
+    });
+
+    return sale;
+  }
+
+  async approve(id: string, approverId: string) {
+    const sale = await this.prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new NotFoundException('Sale not found');
+    if (sale.flag !== 'BELOW_COST') throw new BadRequestException('Sale is not flagged as below cost');
+    return this.prisma.sale.update({
+      where: { id },
+      data: { flag: 'APPROVED', flagApprovedBy: approverId, flagApprovedAt: new Date() },
+    });
+  }
+
+  async createManual(dto: { productId: string; qty: number; unitPrice: number; paymentMethod: PaymentMethod; note?: string; shopId: string }, userId: string) {
+    const priceEntry = await this.prisma.priceEntry.findFirst({
+      where: { productId: dto.productId, priceList: { isActive: true } },
+    });
+    const cost = priceEntry ? (priceEntry.costPromo ?? priceEntry.costNormal) : 0;
+
+    const subtotal = dto.unitPrice * dto.qty;
+    const profit = (dto.unitPrice - cost) * dto.qty;
+
+    const sale = await this.prisma.sale.create({
+      data: {
+        shopId: dto.shopId,
+        paymentMethod: dto.paymentMethod,
+        totalAmount: subtotal,
+        totalCost: cost * dto.qty,
+        grossProfit: profit,
+        flag: 'SPECIAL',
+        servedById: userId,
+        items: {
+          create: [{
+            productId: dto.productId,
+            qty: dto.qty,
+            unitCost: cost,
+            unitPrice: dto.unitPrice,
+            subtotal,
+            profit,
+          }],
+        },
+      },
+      include: { items: true },
+    });
+
+    await this.prisma.stockItem.updateMany({
+      where: { shopId: dto.shopId, productId: dto.productId },
+      data: { qtyOnHand: { decrement: dto.qty } },
+    });
+
+    await this.prisma.stockMovement.create({
+      data: {
+        shopId: dto.shopId,
+        productId: dto.productId,
+        type: 'OUT',
+        qty: -dto.qty,
+        referenceId: sale.id,
+        note: dto.note,
+        createdBy: userId,
+      },
     });
 
     return sale;

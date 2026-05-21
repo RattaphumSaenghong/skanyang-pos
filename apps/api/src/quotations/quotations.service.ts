@@ -1,12 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-
-interface CreateQuotationDto {
-  items: { priceEntryId: string; qty: number }[];
-  customerId?: string;
-  plateNumber?: string;
-  notes?: string;
-}
+import { CreateQuotationDto } from './dto/create-quotation.dto';
 
 interface UpdateQuotationDto {
   plateNumber?: string;

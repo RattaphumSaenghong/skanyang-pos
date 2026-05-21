@@ -85,7 +85,28 @@ export default function QuotationPage() {
                   <p className="font-medium">{item.product?.brand} {item.product?.model}</p>
                   <p className="text-xs text-gray-500">{item.product?.sizeNormalized}</p>
                 </td>
-                <td className="px-4 py-3 text-right">{item.qty}</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="inline-flex items-center gap-1 justify-end">
+                    <button
+                      disabled={item.qty <= 4}
+                      onClick={() =>
+                        updateItem.mutate({ itemId: item.id, unitPriceCash: item.unitPriceCash, qty: item.qty - 4 })
+                      }
+                      className="w-7 h-7 border rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-sm tabular-nums">{item.qty}</span>
+                    <button
+                      onClick={() =>
+                        updateItem.mutate({ itemId: item.id, unitPriceCash: item.unitPriceCash, qty: item.qty + 4 })
+                      }
+                      className="w-7 h-7 border rounded text-sm font-medium hover:bg-gray-100"
+                    >
+                      +
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right font-mono">{item.unitPriceCash.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right font-mono">{item.unitPriceCard.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right font-mono">{item.unitPriceZeroPct.toLocaleString()}</td>
