@@ -153,7 +153,10 @@ export class SalesService {
   findByShop(shopId: string) {
     return this.prisma.sale.findMany({
       where: { shopId },
-      include: { items: { include: { product: true } } },
+      include: {
+        items: { include: { product: true } },
+        servedBy: { select: { username: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });

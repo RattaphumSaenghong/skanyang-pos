@@ -65,10 +65,31 @@ export class QuotationsService {
   async findOne(id: string) {
     const q = await this.prisma.quotation.findUnique({
       where: { id },
-      include: { items: { include: { product: true } }, customer: true },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        customer: true,
+      },
     });
     if (!q) throw new NotFoundException('Quotation not found');
-    return q;
+    // Enrich each item with its priceEntry discount fields
+    const enrichedItems = await Promise.all(
+      q.items.map(async (item) => {
+        const pe = await this.prisma.priceEntry.findUnique({ where: { id: item.priceEntryId } });
+        return {
+          ...item,
+          priceListed: pe?.priceListed ?? 0,
+          discTradeIn: pe?.discTradeIn ?? 0,
+          discCard: pe?.discCard ?? 0,
+          discCash: pe?.discCash ?? 0,
+          discPromo: pe?.discPromo ?? 0,
+        };
+      }),
+    );
+    return { ...q, items: enrichedItems };
   }
 
   async update(id: string, dto: UpdateQuotationDto) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
@@ -15,6 +15,26 @@ interface StockItem {
   product: { id: string; sku: string; sizeNormalized: string; brand: string; model: string };
 }
 
+interface SnapshotEntry {
+  id: string;
+  snapshotId: string;
+  productId: string;
+  sku: string;
+  sizeNormalized: string;
+  qtyActual: number;
+  qtySystem: number;
+}
+
+interface StockSnapshot {
+  id: string;
+  shopId: string;
+  takenAt: string;
+  takenBy: string;
+  label: string | null;
+  archived: boolean;
+  entries: SnapshotEntry[];
+}
+
 type Tab = 'today' | 'snapshot';
 
 export default function StockDashboardPage() {
@@ -26,6 +46,10 @@ export default function StockDashboardPage() {
   const [shopFilter, setShopFilter] = useState<string>(user?.shopId ?? '');
   // Track optimistic qty deltas per productId
   const [pending, setPending] = useState<Record<string, number>>({});
+
+  // Snapshot tab state
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [localQty, setLocalQty] = useState<Record<string, number>>({});
 
   const { data: shops = [] } = useQuery<Shop[]>({
     queryKey: ['shops'],
@@ -69,6 +93,69 @@ export default function StockDashboardPage() {
   };
 
   const items = data ?? [];
+
+  // --- Snapshot tab ---
+  const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery<StockSnapshot[]>({
+    queryKey: ['snapshots', effectiveShopId],
+    queryFn: () =>
+      api.get(`/stock/snapshots${effectiveShopId ? `?shopId=${effectiveShopId}` : ''}`).then((r) => r.data),
+    enabled: activeTab === 'snapshot',
+  });
+
+  const takeSnapshotMutation = useMutation({
+    mutationFn: () =>
+      api.post('/stock/snapshots', { shopId: effectiveShopId || undefined, label: '' }).then((r) => r.data as StockSnapshot),
+    onSuccess: (newSnapshot) => {
+      qc.invalidateQueries({ queryKey: ['snapshots'] });
+      setSelectedSnapshotId(newSnapshot.id);
+      const init: Record<string, number> = {};
+      newSnapshot.entries.forEach((e) => { init[e.id] = e.qtyActual; });
+      setLocalQty(init);
+    },
+  });
+
+  const saveSnapshotMutation = useMutation({
+    mutationFn: ({ id, entries }: { id: string; entries: { entryId: string; qtyActual: number }[] }) =>
+      api.patch(`/stock/snapshots/${id}`, { entries }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['snapshots'] });
+    },
+  });
+
+  const selectedSnapshot = snapshots.find((s) => s.id === selectedSnapshotId) ?? null;
+
+  // When snapshots load and none selected, auto-select the first (newest)
+  useEffect(() => {
+    if (snapshots.length > 0 && !selectedSnapshotId) {
+      const first = snapshots[0];
+      setSelectedSnapshotId(first.id);
+      const init: Record<string, number> = {};
+      first.entries.forEach((e) => { init[e.id] = e.qtyActual; });
+      setLocalQty(init);
+    }
+  }, [snapshots, selectedSnapshotId]);
+
+  // When selected snapshot changes, reinitialise local qty
+  const handleSelectSnapshot = (id: string) => {
+    setSelectedSnapshotId(id);
+    const snap = snapshots.find((s) => s.id === id);
+    if (snap) {
+      const init: Record<string, number> = {};
+      snap.entries.forEach((e) => { init[e.id] = e.qtyActual; });
+      setLocalQty(init);
+    }
+  };
+
+  const formatThaiDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' });
+  };
+
+  const handleSaveSnapshot = () => {
+    if (!selectedSnapshotId) return;
+    const entries = Object.entries(localQty).map(([entryId, qtyActual]) => ({ entryId, qtyActual }));
+    saveSnapshotMutation.mutate({ id: selectedSnapshotId, entries });
+  };
 
   return (
     <div className="p-6">
@@ -167,8 +254,96 @@ export default function StockDashboardPage() {
       )}
 
       {activeTab === 'snapshot' && (
-        <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
-          กำลังพัฒนา — stock snapshots จะมาเร็วๆ นี้
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            {snapshots.length > 0 ? (
+              <select
+                value={selectedSnapshotId ?? ''}
+                onChange={(e) => handleSelectSnapshot(e.target.value)}
+                className="text-sm border rounded-lg px-3 py-1.5 bg-white"
+              >
+                {snapshots.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label ? s.label : 'Snapshot'} — {formatThaiDate(s.takenAt)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm text-gray-400">ยังไม่มีสแนปชอต</span>
+            )}
+            <button
+              onClick={() => takeSnapshotMutation.mutate()}
+              disabled={takeSnapshotMutation.isPending}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {takeSnapshotMutation.isPending ? 'กำลังสร้าง...' : 'ถ่ายภาพสต็อก'}
+            </button>
+          </div>
+
+          {snapshotsLoading ? (
+            <p className="text-gray-400 text-sm">กำลังโหลด...</p>
+          ) : selectedSnapshot ? (
+            <>
+              <div className="bg-white rounded-xl border overflow-hidden mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left">SKU</th>
+                      <th className="px-4 py-3 text-left">ขนาด</th>
+                      <th className="px-4 py-3 text-center">นับจริง</th>
+                      <th className="px-4 py-3 text-right">ระบบ</th>
+                      <th className="px-4 py-3 text-right">ผลต่าง</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {selectedSnapshot.entries.map((entry) => {
+                      const actual = localQty[entry.id] ?? entry.qtyActual;
+                      const diff = actual - entry.qtySystem;
+                      return (
+                        <tr key={entry.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{entry.sku}</td>
+                          <td className="px-4 py-3 text-gray-700">{entry.sizeNormalized}</td>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              value={actual}
+                              onChange={(e) =>
+                                setLocalQty((prev) => ({
+                                  ...prev,
+                                  [entry.id]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-20 text-center border rounded px-2 py-1 text-sm font-mono"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">{entry.qtySystem}</td>
+                          <td
+                            className={`px-4 py-3 text-right font-mono font-semibold ${
+                              diff < 0 ? 'text-red-600' : diff > 0 ? 'text-green-600' : 'text-gray-400'
+                            }`}
+                          >
+                            {diff > 0 ? `+${diff}` : diff}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSaveSnapshot}
+                  disabled={saveSnapshotMutation.isPending}
+                  className="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {saveSnapshotMutation.isPending ? 'กำลังบันทึก...' : 'บันทึก'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-400 py-16">กดปุ่ม "ถ่ายภาพสต็อก" เพื่อสร้างสแนปชอตแรก</p>
+          )}
         </div>
       )}
     </div>

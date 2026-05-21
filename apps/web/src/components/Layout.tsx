@@ -9,6 +9,7 @@ const navItems = [
 
 const ownerItems = [
   { to: '/reports/margins', label: 'รายงาน', icon: '📊' },
+  { to: '/reports/sales', label: 'ยอดขาย', icon: '💰' },
   { to: '/settings/users', label: 'ตั้งค่า', icon: '⚙️' },
 ];
 

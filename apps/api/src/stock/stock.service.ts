@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { MovementType } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 
@@ -40,6 +40,80 @@ export class StockService {
       where: shopId ? { shopId } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 200,
+    });
+  }
+
+  getSnapshots(shopId: string) {
+    return this.prisma.stockSnapshot.findMany({
+      where: { shopId, archived: false },
+      include: { entries: true },
+      orderBy: { takenAt: 'desc' },
+      take: 6,
+    });
+  }
+
+  async takeSnapshot(shopId: string, takenBy: string, label?: string) {
+    const stockItems = await this.prisma.stockItem.findMany({
+      where: { shopId },
+      include: { product: true },
+    });
+
+    const snapshot = await this.prisma.stockSnapshot.create({
+      data: {
+        shopId,
+        takenBy,
+        label,
+        entries: {
+          create: stockItems.map((item) => ({
+            productId: item.productId,
+            sku: item.product.sku,
+            sizeNormalized: item.product.sizeNormalized,
+            qtySystem: item.qtyOnHand,
+            qtyActual: item.qtyOnHand,
+          })),
+        },
+      },
+      include: { entries: true },
+    });
+
+    const all = await this.prisma.stockSnapshot.findMany({
+      where: { shopId, archived: false },
+      orderBy: { takenAt: 'asc' },
+    });
+    if (all.length > 6) {
+      await this.prisma.stockSnapshot.update({
+        where: { id: all[0].id },
+        data: { archived: true },
+      });
+    }
+
+    return snapshot;
+  }
+
+  async saveSnapshot(
+    snapshotId: string,
+    shopId: string,
+    entries: { entryId: string; qtyActual: number }[],
+  ) {
+    const snapshot = await this.prisma.stockSnapshot.findUnique({
+      where: { id: snapshotId },
+    });
+    if (!snapshot || snapshot.shopId !== shopId) {
+      throw new NotFoundException('Snapshot not found');
+    }
+
+    await Promise.all(
+      entries.map((e) =>
+        this.prisma.stockSnapshotEntry.update({
+          where: { id: e.entryId },
+          data: { qtyActual: e.qtyActual },
+        }),
+      ),
+    );
+
+    return this.prisma.stockSnapshot.findUnique({
+      where: { id: snapshotId },
+      include: { entries: true },
     });
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { StockService } from './stock.service';
@@ -25,5 +25,26 @@ export class StockController {
     // OWNER may adjust any shop; STAFF is locked to their own shop
     const shopId = user.role === 'OWNER' ? body.shopId : user.shopId;
     return this.service.adjust(shopId, body.productId, body.qty, body.note ?? '', user.id);
+  }
+
+  @Get('snapshots')
+  getSnapshots(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' && qShopId ? qShopId : user.shopId;
+    return this.service.getSnapshots(shopId);
+  }
+
+  @Post('snapshots')
+  takeSnapshot(@CurrentUser() user: any, @Body() body: { shopId?: string; label?: string }) {
+    const shopId = user.role === 'OWNER' && body.shopId ? body.shopId : user.shopId;
+    return this.service.takeSnapshot(shopId, user.username, body.label);
+  }
+
+  @Patch('snapshots/:id')
+  saveSnapshot(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { entries: { entryId: string; qtyActual: number }[] },
+  ) {
+    return this.service.saveSnapshot(id, user.shopId ?? '', body.entries);
   }
 }

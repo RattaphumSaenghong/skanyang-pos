@@ -48,4 +48,12 @@ export class DisplayService {
     if (!image) throw new NotFoundException('ไม่พบรูปภาพ');
     return this.prisma.displayImage.update({ where: { id }, data: { active: false } });
   }
+
+  async setActiveQuotation(shopId: string, quotationId: string) {
+    await this.prisma.shop.update({
+      where: { id: shopId },
+      data: { activeDisplayQuotationId: quotationId },
+    });
+    return { ok: true };
+  }
 }

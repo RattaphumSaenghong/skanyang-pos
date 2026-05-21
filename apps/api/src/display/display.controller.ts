@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Controller, Delete, Get, Param,
+  BadRequestException, Body, Controller, Delete, Get, Param,
   Post, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -38,5 +38,14 @@ export class DisplayController {
     @Param('id') id: string,
   ) {
     return this.service.deleteImage(id, shopId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':shopId/active-quotation')
+  setActiveQuotation(
+    @Param('shopId') shopId: string,
+    @Body() body: { quotationId: string },
+  ) {
+    return this.service.setActiveQuotation(shopId, body.quotationId);
   }
 }

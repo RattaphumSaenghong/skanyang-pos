@@ -10,6 +10,7 @@ const CheckoutPage = lazy(() => import('../pages/pos/CheckoutPage'));
 const StockDashboardPage = lazy(() => import('../pages/stock/StockDashboardPage'));
 const ProductsImportPage = lazy(() => import('../pages/products/ProductsImportPage'));
 const MarginsReportPage = lazy(() => import('../pages/reports/MarginsReportPage'));
+const SalesReportPage = lazy(() => import('../pages/reports/SalesReportPage'));
 const UsersSettingsPage = lazy(() => import('../pages/settings/UsersSettingsPage'));
 const CustomerDisplayPage = lazy(() => import('../pages/display/CustomerDisplayPage'));
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="products/list" element={<ProductsImportPage />} />
           <Route path="products/import" element={<ProductsImportPage />} />
           <Route path="reports/margins" element={<MarginsReportPage />} />
+          <Route path="reports/sales" element={<SalesReportPage />} />
           <Route path="settings/users" element={<UsersSettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/pos/search" replace />} />
