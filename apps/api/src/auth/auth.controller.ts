@@ -1,5 +1,6 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -15,6 +16,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @UseGuards(ThrottlerGuard)
   login(@Body() dto: LoginDto, @Req() req: Request) {
     const forwarded = req.headers['x-forwarded-for'];
     const ip = forwarded
