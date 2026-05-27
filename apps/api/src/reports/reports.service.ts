@@ -1,13 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
+function paymentFee(method: string, revenue: number): number {
+  if (method === 'CARD') return revenue * 0.025;
+  if (method === 'ZERO_PCT') return revenue * 0.0581;
+  return 0;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async margins(shopId: string) {
+  async margins(shopId: string | null) {
     const items = await this.prisma.saleItem.findMany({
-      where: { sale: { shopId } },
+      where: shopId ? { sale: { is: { shopId } } } : undefined,
       include: { product: true, sale: { select: { createdAt: true, paymentMethod: true } } },
     });
 
@@ -26,7 +32,7 @@ export class ReportsService {
       };
       existing.totalRevenue += item.subtotal;
       existing.totalCost += item.unitCost * item.qty;
-      existing.totalProfit += item.profit;
+      existing.totalProfit += item.profit - paymentFee(item.sale.paymentMethod, item.subtotal);
       existing.unitsSold += item.qty;
       map.set(key, existing);
     }
@@ -36,10 +42,10 @@ export class ReportsService {
       .sort((a, b) => b.totalProfit - a.totalProfit);
   }
 
-  async topSellers(shopId: string) {
+  async topSellers(shopId: string | null) {
     const items = await this.prisma.saleItem.groupBy({
       by: ['productId'],
-      where: { sale: { shopId } },
+      where: shopId ? { sale: { is: { shopId } } } : undefined,
       _sum: { qty: true, subtotal: true },
       orderBy: { _sum: { qty: 'desc' } },
       take: 20,

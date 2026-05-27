@@ -1,10 +1,15 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth.store';
+import { api } from '../lib/api';
+
+interface Shop { id: string; name: string }
 
 const navItems = [
   { to: '/pos/search', label: 'POS', icon: '🛒' },
   { to: '/stock/dashboard', label: 'คลังสินค้า', icon: '📦' },
-  { to: '/products/list', label: 'สินค้า', icon: '🔍' },
+  { to: '/products/list', label: 'Upload', icon: '📤' },
 ];
 
 const ownerItems = [
@@ -14,13 +19,33 @@ const ownerItems = [
 ];
 
 export default function Layout() {
-  const { user, logout, isOwner } = useAuthStore();
+  const { user, logout, isOwner, setSelectedShopId } = useAuthStore();
   const navigate = useNavigate();
+
+  const { data: shops = [] } = useQuery<Shop[]>({
+    queryKey: ['shops'],
+    queryFn: () => api.get('/shops').then((r) => r.data),
+    enabled: isOwner(),
+  });
+
+  // Default to first shop when owner logs in or shops load
+  useEffect(() => {
+    if (isOwner() && shops.length > 0 && !user?.shopId) {
+      setSelectedShopId(shops[0].id);
+    }
+  }, [shops, user?.shopId, isOwner, setSelectedShopId]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const handleOpenDisplay = async () => {
+    const shopId = user?.shopId ?? shops[0]?.id;
+    if (shopId) window.open(`/display/${shopId}`, '_blank');
+  };
+
+  const selectedShop = shops.find((s) => s.id === user?.shopId);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -28,6 +53,20 @@ export default function Layout() {
         <div className="p-4 border-b">
           <p className="font-bold text-lg">ส.การยาง</p>
           <p className="text-xs text-gray-500">{user?.username} · {user?.role === 'OWNER' ? 'เจ้าของ' : 'พนักงาน'}</p>
+          {isOwner() && shops.length > 0 && (
+            <select
+              value={user?.shopId ?? ''}
+              onChange={(e) => setSelectedShopId(e.target.value)}
+              className="mt-2 w-full text-xs border rounded px-2 py-1 bg-gray-50 font-medium text-gray-700"
+            >
+              {shops.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+          {!isOwner() && user?.shopId && (
+            <p className="text-xs text-blue-600 mt-1 font-medium">{selectedShop?.name ?? ''}</p>
+          )}
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map((item) => (
@@ -59,7 +98,14 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="p-2 border-t">
+        <div className="p-2 border-t space-y-1">
+          <button
+            onClick={handleOpenDisplay}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            <span>🖥️</span>
+            จอลูกค้า
+          </button>
           <button
             onClick={handleLogout}
             className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"

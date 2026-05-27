@@ -1,0 +1,13 @@
+
+> @org/source@0.0.0 dev:web
+> npx nx serve web
+
+
+[2m> [22m[2mnx run[22m @org/web:serve
+
+[2m> [22mvite
+
+
+  [32m[1mVITE[22m v8.0.13[39m  [2mready in [0m[1m334[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4200[22m/[39m

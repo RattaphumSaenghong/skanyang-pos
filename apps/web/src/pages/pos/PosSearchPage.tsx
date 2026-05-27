@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -11,51 +11,75 @@ interface PriceEntry {
   priceCard: number;
   priceZeroPct: number;
   priceBulk: number;
-  costNormal: number;
-  costPromo: number | null;
+  priceListed: number;
   marginCash: number | null;
-  product: { sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean };
+  qtyOnHand: number;
+  qtyAvailable: number;
+  product: { sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; dotYear?: string | null };
 }
 
 export default function PosSearchPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const isOwner = useAuthStore((s) => s.isOwner());
+  const effectiveShopId = useAuthStore((s) => s.effectiveShopId());
   const [search, setSearch] = useState('');
   const [qty, setQty] = useState<Record<string, number>>({});
-  const [creating, setCreating] = useState(false);
+  const [displayOn, setDisplayOn] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['price-entries', search],
+    queryKey: ['price-entries', effectiveShopId, search],
     queryFn: () =>
       search.length >= 3
-        ? api.get(`/products/search?q=${encodeURIComponent(search)}`).then((r) => r.data)
+        ? api.get(`/products/search?q=${encodeURIComponent(search)}&shopId=${effectiveShopId}`).then((r) => r.data)
         : Promise.resolve([]),
     enabled: search.length >= 3,
   });
 
   const entries: PriceEntry[] = data ?? [];
 
+  const shopId = effectiveShopId;
+  useEffect(() => {
+    if (!shopId) return;
+    if (!displayOn) {
+      api.post(`/display/${shopId}/search-results`, { results: null }).catch(() => {});
+      return;
+    }
+    const stripped = entries.map((e) => ({
+      id: e.id,
+      product: e.product,
+      priceCash: e.priceCash,
+      priceCard: e.priceCard,
+      priceZeroPct: e.priceZeroPct,
+    }));
+    api.post(`/display/${shopId}/search-results`, { results: stripped.length ? stripped : null }).catch(() => {});
+  }, [entries, displayOn, shopId]);
+
+  // Clear display when leaving this page
+  useEffect(() => {
+    return () => {
+      if (shopId) api.post(`/display/${shopId}/search-results`, { results: null }).catch(() => {});
+    };
+  }, [shopId]);
+
   const createQuotation = useMutation({
     mutationFn: (items: { priceEntryId: string; qty: number }[]) =>
-      api.post('/quotations', { items }).then((r) => r.data),
+      api.post('/quotations', { items, shopId: effectiveShopId }).then((r) => r.data),
     onSuccess: (q) => navigate(`/pos/quotation/${q.id}`),
+    onError: (e: any) => setCreateError(e?.response?.data?.message ?? 'เกิดข้อผิดพลาด'),
   });
 
-  const handleAddToQuote = async () => {
+  const handleAddToQuote = () => {
     const items = Object.entries(qty)
       .filter(([, q]) => q > 0)
       .map(([priceEntryId, q]) => ({ priceEntryId, qty: q }));
     if (!items.length) return;
-    setCreating(true);
+    setCreateError(null);
     createQuotation.mutate(items);
   };
 
-  const effectiveCost = (e: PriceEntry) => e.costPromo ?? e.costNormal;
-  const margin = (e: PriceEntry) => {
-    const cost = effectiveCost(e);
-    return cost > 0 ? ((e.priceCash - cost) / cost) * 100 : 0;
-  };
 
   return (
     <div className="p-6">
@@ -68,14 +92,30 @@ export default function PosSearchPage() {
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
         />
+        {shopId && (
+          <button
+            onClick={() => setDisplayOn((v) => !v)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              displayOn
+                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            🖥️ {displayOn ? 'แสดงบนจอ ON' : 'แสดงบนจอ OFF'}
+          </button>
+        )}
         <button
           onClick={handleAddToQuote}
-          disabled={creating || !Object.values(qty).some((q) => q > 0)}
+          disabled={createQuotation.isPending || !Object.values(qty).some((q) => q > 0)}
           className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40"
         >
-          สร้างใบเสนอราคา
+          {createQuotation.isPending ? 'กำลังสร้าง...' : 'สร้างใบเสนอราคา'}
         </button>
       </div>
+
+      {createError && (
+        <p className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{createError}</p>
+      )}
 
       {isFetching && <p className="text-gray-400 text-sm">กำลังค้นหา...</p>}
 
@@ -90,12 +130,13 @@ export default function PosSearchPage() {
                 <th className="px-4 py-3 text-right">0%</th>
                 <th className="px-4 py-3 text-right">ราคาหน้าร้าน</th>
                 {isOwner && <th className="px-4 py-3 text-right">กำไร%</th>}
+                <th className="px-4 py-3 text-right">สต็อก</th>
                 <th className="px-4 py-3 text-center">จำนวน</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {entries.map((e) => {
-                const m = margin(e);
+                const m = e.marginCash ?? 0;
                 const warning = m < 5;
                 return (
                   <tr key={e.id} className="hover:bg-gray-50">
@@ -106,19 +147,30 @@ export default function PosSearchPage() {
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCard.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceZeroPct.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-400">{e.priceBulk.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-mono text-gray-400">{e.priceListed.toLocaleString()}</td>
                     {isOwner && (
                       <td className={`px-4 py-3 text-right font-mono text-xs ${warning ? 'text-red-500' : 'text-green-600'}`}>
                         {m.toFixed(1)}%
                       </td>
                     )}
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-full ${
+                        e.qtyAvailable === 0
+                          ? 'bg-red-100 text-red-600'
+                          : e.qtyAvailable <= 4
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {e.qtyAvailable}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <div className="inline-flex items-center gap-1">
                         <button
-                          disabled={!qty[e.id] || qty[e.id] <= 4}
+                          disabled={!qty[e.id] || qty[e.id] <= 1}
                           onClick={() =>
                             setQty((q) => {
-                              const next = (q[e.id] ?? 0) - 4;
+                              const next = (q[e.id] ?? 0) - 1;
                               if (next <= 0) {
                                 const { [e.id]: _, ...rest } = q;
                                 return rest;
@@ -130,13 +182,11 @@ export default function PosSearchPage() {
                         >
                           −
                         </button>
-                        <span className="w-8 text-center text-sm tabular-nums">
-                          {qty[e.id] ?? 0}
+                        <span className="w-12 text-center text-sm tabular-nums">
+                          {qty[e.id] ?? 0}{e.product.isSetPricing ? ' ชุด' : ''}
                         </span>
                         <button
-                          onClick={() =>
-                            setQty((q) => ({ ...q, [e.id]: (q[e.id] ?? 0) + 4 }))
-                          }
+                          onClick={() => setQty((q) => ({ ...q, [e.id]: (q[e.id] ?? 0) + 1 }))}
                           className="w-7 h-7 border rounded text-sm font-medium hover:bg-gray-100"
                         >
                           +

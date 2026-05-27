@@ -13,8 +13,10 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   setTokens: (access: string, refresh: string, user: AuthUser) => void;
+  setSelectedShopId: (id: string) => void;
   logout: () => void;
   isOwner: () => boolean;
+  effectiveShopId: () => string | null;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -28,11 +30,15 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('refresh_token', refreshToken);
         set({ accessToken, refreshToken, user });
       },
+      // Owner picks a shop from the dropdown — update user.shopId directly
+      setSelectedShopId: (id) =>
+        set((s) => ({ user: s.user ? { ...s.user, shopId: id } : null })),
       logout: () => {
         localStorage.clear();
         set({ user: null, accessToken: null, refreshToken: null });
       },
       isOwner: () => get().user?.role === 'OWNER',
+      effectiveShopId: () => get().user?.shopId ?? null,
     }),
     { name: 'auth-store', partialize: (s) => ({ user: s.user }) },
   ),

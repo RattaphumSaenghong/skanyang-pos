@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 
@@ -14,9 +14,17 @@ interface UpdateQuotationDto {
 export class QuotationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateQuotationDto, userId: string, shopId: string) {
-    const activePL = await this.prisma.priceList.findFirst({ where: { isActive: true } });
-    if (!activePL) throw new ForbiddenException('No active price list');
+  async create(dto: CreateQuotationDto, userId: string, shopId: string | null) {
+    // OWNER has shopId=null — fall back to first shop that has an active price list
+    let effectiveShopId = shopId;
+    let activePL;
+    if (effectiveShopId) {
+      activePL = await this.prisma.priceList.findFirst({ where: { shopId: effectiveShopId, isActive: true } });
+    } else {
+      activePL = await this.prisma.priceList.findFirst({ where: { isActive: true } });
+      if (activePL) effectiveShopId = activePL.shopId;
+    }
+    if (!activePL || !effectiveShopId) throw new ForbiddenException('No active price list');
 
     const entries = await this.prisma.priceEntry.findMany({
       where: { id: { in: dto.items.map((i) => i.priceEntryId) } },
@@ -25,7 +33,7 @@ export class QuotationsService {
 
     const quotation = await this.prisma.quotation.create({
       data: {
-        shopId,
+        shopId: effectiveShopId,
         priceListId: activePL.id,
         createdById: userId,
         customerId: dto.customerId ?? null,
@@ -39,6 +47,7 @@ export class QuotationsService {
               priceEntryId: item.priceEntryId,
               qty: item.qty,
               isSetPricing: entry.product.isSetPricing,
+              isIndividual: item.isIndividual ?? false,
               unitPriceCash: entry.priceCash,
               unitPriceCard: entry.priceCard,
               unitPriceZeroPct: entry.priceZeroPct,
@@ -49,20 +58,16 @@ export class QuotationsService {
       include: { items: { include: { product: true } } },
     });
 
-    // Reserve stock
-    for (const item of dto.items) {
-      const entry = entries.find((e) => e.id === item.priceEntryId)!;
-      await this.prisma.stockItem.upsert({
-        where: { shopId_productId: { shopId, productId: entry.productId } },
-        create: { shopId, productId: entry.productId, qtyReserved: item.qty },
-        update: { qtyReserved: { increment: item.qty } },
-      });
-    }
+    // Push to customer display
+    await this.prisma.shop.update({
+      where: { id: effectiveShopId },
+      data: { activeDisplayQuotationId: quotation.id },
+    });
 
     return quotation;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, shopId?: string | null, role?: string) {
     const q = await this.prisma.quotation.findUnique({
       where: { id },
       include: {
@@ -75,6 +80,7 @@ export class QuotationsService {
       },
     });
     if (!q) throw new NotFoundException('Quotation not found');
+    if (role !== 'OWNER' && shopId && q.shopId !== shopId) throw new ForbiddenException('Access denied');
     // Enrich each item with its priceEntry discount fields
     const enrichedItems = await Promise.all(
       q.items.map(async (item) => {
@@ -92,8 +98,36 @@ export class QuotationsService {
     return { ...q, items: enrichedItems };
   }
 
-  async update(id: string, dto: UpdateQuotationDto) {
+  async update(id: string, dto: UpdateQuotationDto, shopId?: string | null, role?: string) {
+    if (role !== 'OWNER' && shopId) {
+      const q = await this.prisma.quotation.findUnique({ where: { id }, select: { shopId: true } });
+      if (q && q.shopId !== shopId) throw new ForbiddenException('Access denied');
+    }
     return this.prisma.quotation.update({ where: { id }, data: dto as any });
+  }
+
+  async cancel(id: string, shopId?: string | null, role?: string) {
+    const quotation = await this.prisma.quotation.findUnique({ where: { id } });
+    if (!quotation) throw new NotFoundException('Quotation not found');
+    if (role !== 'OWNER' && shopId && quotation.shopId !== shopId) throw new ForbiddenException('Access denied');
+    if (quotation.status === 'CONVERTED') throw new BadRequestException('ไม่สามารถยกเลิกใบเสนอราคาที่แปลงเป็นการขายแล้ว');
+
+    // Clear from display if it was active
+    await this.prisma.shop.updateMany({
+      where: { id: quotation.shopId, activeDisplayQuotationId: id },
+      data: { activeDisplayQuotationId: null },
+    });
+
+    return this.prisma.quotation.update({ where: { id }, data: { status: 'CANCELLED' } });
+  }
+
+  async updateItem(quotationId: string, itemId: string, dto: { qty?: number; isIndividual?: boolean }) {
+    const item = await this.prisma.quotationItem.findUnique({ where: { id: itemId } });
+    if (!item || item.quotationId !== quotationId) throw new NotFoundException('Item not found');
+    const data: { qty?: number; isIndividual?: boolean } = {};
+    if (dto.qty !== undefined) data.qty = dto.qty;
+    if (dto.isIndividual !== undefined) data.isIndividual = dto.isIndividual;
+    return this.prisma.quotationItem.update({ where: { id: itemId }, data });
   }
 
   findByShop(shopId: string) {
@@ -102,6 +136,39 @@ export class QuotationsService {
       include: { items: { include: { product: true } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
+    });
+  }
+
+  report(shopId: string | null, dateFrom?: string, dateTo?: string) {
+    const where: any = {};
+    if (shopId) where.shopId = shopId;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+    return this.prisma.quotation.findMany({
+      where,
+      select: {
+        id: true,
+        number: true,
+        createdAt: true,
+        status: true,
+        plateNumber: true,
+        shopId: true,
+        items: {
+          select: {
+            qty: true,
+            product: { select: { sizeNormalized: true, brand: true, model: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     });
   }
 }

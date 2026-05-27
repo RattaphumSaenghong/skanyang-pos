@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -13,12 +13,14 @@ export class ReportsController {
   constructor(private service: ReportsService) {}
 
   @Get('margins')
-  margins(@CurrentUser() user: any) {
-    return this.service.margins(user.shopId);
+  margins(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.margins(shopId);
   }
 
   @Get('top-sellers')
-  topSellers(@CurrentUser() user: any) {
-    return this.service.topSellers(user.shopId);
+  topSellers(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.topSellers(shopId);
   }
 }

@@ -1,40 +1,14 @@
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
-  ValidationArguments,
-  ValidationOptions,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
-  registerDecorator,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
-@ValidatorConstraint({ name: 'isDivisibleBy4' })
-class IsDivisibleBy4Constraint implements ValidatorConstraintInterface {
-  validate(value: number) {
-    return Number.isInteger(value) && value % 4 === 0;
-  }
-  defaultMessage(_args: ValidationArguments) {
-    return 'qty must be a multiple of 4';
-  }
-}
-
-function IsDivisibleBy4(options?: ValidationOptions) {
-  return (object: object, propertyName: string) => {
-    registerDecorator({
-      target: object.constructor,
-      propertyName,
-      options,
-      constraints: [],
-      validator: IsDivisibleBy4Constraint,
-    });
-  };
-}
 
 export class CreateQuotationItemDto {
   @IsString()
@@ -42,9 +16,12 @@ export class CreateQuotationItemDto {
   priceEntryId: string;
 
   @IsInt()
-  @Min(4)
-  @IsDivisibleBy4()
+  @Min(1)
   qty: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isIndividual?: boolean;
 }
 
 export class CreateQuotationDto {

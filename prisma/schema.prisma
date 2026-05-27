@@ -12,6 +12,7 @@ model Shop {
   name                     String
   address                  String?
   phone                    String?
+  email                    String?
   active                   Boolean  @default(true)
   createdAt                DateTime @default(now())
   activeDisplayQuotationId String?
@@ -25,6 +26,8 @@ model Shop {
   displayImages  DisplayImage[]
   stockSnapshots StockSnapshot[]
   ipWhitelist    IpWhitelist[]
+  priceLists     PriceList[]
+  products       Product[]
 }
 
 model User {
@@ -50,7 +53,9 @@ enum Role {
 
 model Product {
   id             String   @id @default(cuid())
-  sku            String   @unique
+  shop           Shop     @relation(fields: [shopId], references: [id])
+  shopId         String
+  sku            String
   brand          String
   model          String
   sizeWidth      Int
@@ -60,17 +65,23 @@ model Product {
   sizeRaw        String
   isSetPricing   Boolean  @default(false)
   dotYear        String?
+  sortOrder      Int      @default(0)
   active         Boolean  @default(true)
+  imageUrl       String?
   createdAt      DateTime @default(now())
 
   priceEntries   PriceEntry[]
   stockItems     StockItem[]
   quotationItems QuotationItem[]
   saleItems      SaleItem[]
+
+  @@unique([shopId, sku])
 }
 
 model PriceList {
   id         String   @id @default(cuid())
+  shop       Shop     @relation(fields: [shopId], references: [id])
+  shopId     String
   name       String
   month      Int
   year       Int
@@ -101,8 +112,10 @@ model PriceEntry {
   discCard     Float  @default(0)
   discCash     Float  @default(0)
   discPromo    Float  @default(0)
-  marginCash   Float?
-  marginBulk   Float?
+  marginCash    Float?
+  marginCard    Float?
+  marginZeroPct Float?
+  marginBulk    Float?
 
   @@unique([priceListId, productId])
 }
@@ -158,6 +171,7 @@ model Customer {
 
 model Quotation {
   id          String          @id @default(cuid())
+  number      Int             @default(autoincrement())
   shop        Shop            @relation(fields: [shopId], references: [id])
   shopId      String
   customer    Customer?       @relation(fields: [customerId], references: [id])
@@ -185,6 +199,7 @@ enum QuotationStatus {
   ACCEPTED
   EXPIRED
   CONVERTED
+  CANCELLED
 }
 
 model QuotationItem {
@@ -200,12 +215,14 @@ model QuotationItem {
   unitPriceCash    Float
   unitPriceCard    Float
   unitPriceZeroPct Float
+  isIndividual     Boolean @default(false)
   priceOverride    Boolean @default(false)
   overrideNote     String?
 }
 
 model Sale {
   id             String        @id @default(cuid())
+  number         Int           @default(autoincrement())
   shop           Shop          @relation(fields: [shopId], references: [id])
   shopId         String
   quotation      Quotation?    @relation(fields: [quotationId], references: [id])

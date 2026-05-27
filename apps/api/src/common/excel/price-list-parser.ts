@@ -1,6 +1,9 @@
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface ParsedPriceRow {
+  sortOrder: number;
+  rowIndex: number;
   model: string;
   brand: string;
   sizeRaw: string;
@@ -22,6 +25,10 @@ export interface ParsedPriceRow {
   discTradeIn: number;
   discCard: number;
   discCash: number;
+  marginCash: number | null;
+  marginCard: number | null;
+  marginZeroPct: number | null;
+  marginBulk: number | null;
 }
 
 export interface ParseResult {
@@ -64,19 +71,21 @@ export function inferBrand(model: string): string {
   return 'MICHELIN';
 }
 
-/** Normalize any tire size string to "205/55-16" format */
+/** Normalize any tire size string to "205/55-16" or "205/55-16*25" format */
 export function normalizeSize(raw: string): string {
-  let s = raw.trim().toUpperCase().replace(/\*\d+$/, '').trim();
-  // Replace R separator with -
-  s = s.replace(/R(\d{2})\b/, '-$1');
-  // Match: 3-digit width / 2-digit series - 2-digit rim
-  const m = s.match(/(\d{3})\s*[/]\s*(\d{2})\s*[-]\s*(\d{2})/);
-  if (m) return `${m[1]}/${m[2]}-${m[3]}`;
-  return s;
+  const s = raw.trim().toUpperCase();
+  const dotMatch = s.match(/\*(\d+)$/);
+  const dotSuffix = dotMatch ? `*${dotMatch[1]}` : '';
+  let base = s.replace(/\*\d+$/, '').trim();
+  base = base.replace(/R(\d{2})\b/, '-$1');
+  const m = base.match(/(\d{3})\s*[/]\s*(\d{2})\s*[-]\s*(\d{2})/);
+  if (m) return `${m[1]}/${m[2]}-${m[3]}${dotSuffix}`;
+  return base + dotSuffix;
 }
 
 function parseSizeParts(normalized: string): { width: number; series: number; rim: number } | null {
-  const m = normalized.match(/^(\d{3})\/(\d{2})-(\d{2})$/);
+  const base = normalized.replace(/\*\d+$/, '');
+  const m = base.match(/^(\d{3})\/(\d{2})-(\d{2})$/);
   if (!m) return null;
   return { width: parseInt(m[1]), series: parseInt(m[2]), rim: parseInt(m[3]) };
 }
@@ -196,10 +205,9 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
 
       const brand = inferBrand(model);
 
-      // DOT year: prefer col B, fallback to *NN suffix in size
-      const dotColB = v(1) ? String(v(1)).trim() : null;
-      const dotFromSize = (() => { const m = sizeStr.match(/\*(\d+)$/); return m ? m[1] : null; })();
-      const dotYear = dotColB || dotFromSize || null;
+      // DOT year: extracted from *NN suffix in the size string (now preserved in sizeNormalized).
+      // Col B may contain a full DOT WWYY code but we don't use it for deduplication.
+      const dotYear = (() => { const m = sizeStr.match(/\*(\d+)$/); return m ? m[1] : null; })();
 
       // Set pricing = pink fill (FF99FF)
       const fillRgb = getFillRgb(ws, r, 0);
@@ -243,7 +251,28 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
         if (priceBulk <= effectiveCost) priceBulk = priceCash; // sanity floor
       }
 
+      // Margins — read pre-computed profit-per-set from Excel (cols V/W/X = 21/22/23)
+      // and bulk gross margin ratio from col 31.
+      // Formula: margin% = (profit_per_set / 4 / selling_price) * 100
+      const profitCashSet  = num(v(21));
+      const profitCardSet  = num(v(22));
+      const profitZeroSet  = num(v(23));
+      const marginBulkRaw  = num(v(31));
+
+      const pct = (profit: number | null, price: number) =>
+        profit !== null && price > 0
+          ? parseFloat(((profit / 4 / price) * 100).toFixed(2))
+          : null;
+
+      const marginCash    = pct(profitCashSet, priceCash);
+      const marginCard    = pct(profitCardSet, priceCard);
+      const marginZeroPct = pct(profitZeroSet, priceZeroPct);
+      const marginBulk    = marginBulkRaw !== null
+        ? parseFloat((marginBulkRaw * 100).toFixed(2)) : null;
+
       rows.push({
+        sortOrder: rows.length,
+        rowIndex: r,
         model,
         brand,
         sizeRaw: sizeStr,
@@ -265,6 +294,10 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
         discTradeIn,
         discCard,
         discCash,
+        marginCash,
+        marginCard,
+        marginZeroPct,
+        marginBulk,
       });
     } catch (e) {
       skipped++;
@@ -273,4 +306,26 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
   }
 
   return { rows, sheetName, skipped, errors };
+}
+
+export async function extractRowImages(buffer: Buffer): Promise<Map<number, { data: Buffer; ext: string }>> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+
+  const PRINT_KEYWORDS_LOWER = ['ปริ้น', 'print', 'ปริ้นท์'];
+  const isPrint = (s: string) => PRINT_KEYWORDS_LOWER.some((k) => s.toLowerCase().includes(k));
+  const sheet = workbook.worksheets.filter((ws) => !isPrint(ws.name)).slice(-1)[0]
+    ?? workbook.worksheets[0];
+  if (!sheet) return new Map();
+
+  const imageMap = new Map<number, { data: Buffer; ext: string }>();
+  for (const img of sheet.getImages()) {
+    const row = img.range.tl.nativeRow;
+    if (imageMap.has(row)) continue;
+    const imageData = workbook.getImage(Number(img.imageId));
+    if (imageData?.buffer) {
+      imageMap.set(row, { data: imageData.buffer as unknown as Buffer, ext: String(imageData.extension ?? 'png') });
+    }
+  }
+  return imageMap;
 }

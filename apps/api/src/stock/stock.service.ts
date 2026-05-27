@@ -6,29 +6,78 @@ import { PrismaService } from '../common/prisma/prisma.service';
 export class StockService {
   constructor(private prisma: PrismaService) {}
 
-  findByShop(shopId: string | null) {
-    return this.prisma.stockItem.findMany({
-      where: shopId ? { shopId } : undefined,
-      include: { product: true, shop: { select: { id: true, name: true } } },
-      orderBy: { product: { sizeNormalized: 'asc' } },
+  async findByShop(shopId: string | null) {
+    // All-shops view (owner): show only products that have a StockItem
+    if (!shopId) {
+      return this.prisma.stockItem.findMany({
+        where: { product: { is: { active: true } } },
+        select: {
+          id: true,
+          shopId: true,
+          qtyOnHand: true,
+          qtyReserved: true,
+          shop: { select: { id: true, name: true } },
+          product: { select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, sizeWidth: true, sizeSeries: true, sizeRim: true, dotYear: true, isSetPricing: true } },
+        },
+        orderBy: [{ product: { sortOrder: 'asc' } }],
+      });
+    }
+
+    // Shop-specific view: query Products so items with no StockItem still appear (qty 0)
+    const products = await this.prisma.product.findMany({
+      where: { shopId, active: true },
+      include: {
+        stockItems: { where: { shopId } },
+        shop: { select: { id: true, name: true } },
+      },
+      orderBy: { sortOrder: 'asc' },
     });
+
+    return products.map((p) => ({
+      id: p.stockItems[0]?.id ?? `virtual_${shopId}_${p.id}`,
+      shopId,
+      qtyOnHand: p.stockItems[0]?.qtyOnHand ?? 0,
+      qtyReserved: p.stockItems[0]?.qtyReserved ?? 0,
+      shop: p.shop,
+      product: {
+        id: p.id,
+        sku: p.sku,
+        brand: p.brand,
+        model: p.model,
+        sizeNormalized: p.sizeNormalized,
+        sizeWidth: p.sizeWidth,
+        sizeSeries: p.sizeSeries,
+        sizeRim: p.sizeRim,
+        dotYear: p.dotYear,
+        isSetPricing: p.isSetPricing,
+      },
+    }));
   }
 
   async adjust(shopId: string, productId: string, qty: number, note: string, userId: string) {
+    let item;
     if (qty < 0) {
-      const current = await this.prisma.stockItem.findUnique({
+      // Atomic: decrement only if sufficient stock exists
+      const result = await this.prisma.stockItem.updateMany({
+        where: { shopId, productId, qtyOnHand: { gte: -qty } },
+        data: { qtyOnHand: { increment: qty } },
+      });
+      if (result.count === 0) {
+        const current = await this.prisma.stockItem.findUnique({
+          where: { shopId_productId: { shopId, productId } },
+        });
+        throw new BadRequestException(`สต็อกไม่เพียงพอ (มี ${current?.qtyOnHand ?? 0} ชิ้น)`);
+      }
+      item = await this.prisma.stockItem.findUnique({
         where: { shopId_productId: { shopId, productId } },
       });
-      const currentQty = current?.qtyOnHand ?? 0;
-      if (currentQty + qty < 0) {
-        throw new BadRequestException(`สต็อกไม่เพียงพอ (มี ${currentQty} ชิ้น)`);
-      }
+    } else {
+      item = await this.prisma.stockItem.upsert({
+        where: { shopId_productId: { shopId, productId } },
+        create: { shopId, productId, qtyOnHand: qty },
+        update: { qtyOnHand: { increment: qty } },
+      });
     }
-    const item = await this.prisma.stockItem.upsert({
-      where: { shopId_productId: { shopId, productId } },
-      create: { shopId, productId, qtyOnHand: Math.max(0, qty) },
-      update: { qtyOnHand: { increment: qty } },
-    });
     await this.prisma.stockMovement.create({
       data: { shopId, productId, type: qty > 0 ? MovementType.IN : MovementType.ADJUST, qty, note, createdBy: userId },
     });
@@ -43,19 +92,44 @@ export class StockService {
     });
   }
 
-  getSnapshots(shopId: string) {
-    return this.prisma.stockSnapshot.findMany({
+  async getSnapshots(shopId: string) {
+    const snapshots = await this.prisma.stockSnapshot.findMany({
       where: { shopId, archived: false },
-      include: { entries: true },
+      include: { entries: { orderBy: { sku: 'asc' } } },
       orderBy: { takenAt: 'desc' },
       take: 6,
     });
+
+    // Enrich entries with brand/model/dotYear from the Product table
+    const productIds = [...new Set(snapshots.flatMap((s) => s.entries.map((e) => e.productId)))];
+    if (productIds.length === 0) return snapshots;
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, brand: true, model: true, dotYear: true },
+    });
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    return snapshots.map((s) => ({
+      ...s,
+      entries: s.entries.map((e) => ({
+        ...e,
+        brand: productMap.get(e.productId)?.brand ?? '',
+        model: productMap.get(e.productId)?.model ?? '',
+        dotYear: productMap.get(e.productId)?.dotYear ?? null,
+      })),
+    }));
   }
 
   async takeSnapshot(shopId: string, takenBy: string, label?: string) {
     const stockItems = await this.prisma.stockItem.findMany({
-      where: { shopId },
-      include: { product: true },
+      where: { shopId, product: { is: { active: true } } },
+      select: {
+        productId: true,
+        qtyOnHand: true,
+        product: { select: { sku: true, brand: true, model: true, sizeNormalized: true, dotYear: true } },
+      },
+      orderBy: [{ product: { sortOrder: 'asc' } }],
     });
 
     const snapshot = await this.prisma.stockSnapshot.create({

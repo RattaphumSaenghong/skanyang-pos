@@ -5,11 +5,12 @@ import { PrismaService } from '../common/prisma/prisma.service';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async search(q: string, shopId?: string | null) {
-    const activePriceList = await this.prisma.priceList.findFirst({ where: { isActive: true } });
+  async search(q: string, role: 'OWNER' | 'STAFF', shopId?: string | null) {
+    if (!shopId) return [];
+    const activePriceList = await this.prisma.priceList.findFirst({ where: { shopId, isActive: true } });
     if (!activePriceList) return [];
 
-    return this.prisma.priceEntry.findMany({
+    const entries = await this.prisma.priceEntry.findMany({
       where: {
         priceListId: activePriceList.id,
         product: {
@@ -23,7 +24,49 @@ export class ProductsService {
         },
       },
       include: { product: true },
+      orderBy: { product: { sortOrder: 'asc' } },
       take: 50,
+    });
+
+    const productIds = entries.map((e) => e.productId);
+    const stockItems = await this.prisma.stockItem.findMany({
+      where: { shopId, productId: { in: productIds } },
+      select: { productId: true, qtyOnHand: true, qtyReserved: true },
+    });
+    const stockMap = new Map(stockItems.map((s) => [s.productId, s]));
+
+    return entries.map((entry) => {
+      const stock = stockMap.get(entry.productId);
+      const qtyOnHand = stock?.qtyOnHand ?? 0;
+      const qtyAvailable = qtyOnHand;
+
+      const staffShape = {
+        id: entry.id,
+        productId: entry.productId,
+        product: {
+          sku: entry.product.sku,
+          brand: entry.product.brand,
+          model: entry.product.model,
+          sizeNormalized: entry.product.sizeNormalized,
+          isSetPricing: entry.product.isSetPricing,
+          dotYear: entry.product.dotYear,
+        },
+        priceListed: entry.priceListed,
+        priceCash: entry.priceCash,
+        priceCard: entry.priceCard,
+        priceZeroPct: entry.priceZeroPct,
+        priceBulk: entry.priceBulk,
+        discTradeIn: entry.discTradeIn,
+        discCard: entry.discCard,
+        discCash: entry.discCash,
+        discPromo: entry.discPromo,
+        qtyOnHand,
+        qtyAvailable,
+      };
+
+      if (role !== 'OWNER') return staffShape;
+
+      return { ...staffShape, costNormal: entry.costNormal, costPromo: entry.costPromo, marginCash: entry.marginCash };
     });
   }
 

@@ -6,3 +6,9 @@
     font-family: 'Noto Sans Thai', 'Inter', system-ui, sans-serif;
   }
 }
+
+@media print {
+  nav, aside, header, button, .no-print { display: none !important; }
+  main { overflow: visible !important; }
+  body { background: white; }
+}

@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useAuthStore } from '../../store/auth.store';
 
 export default function MarginsReportPage() {
+  const shopId = useAuthStore((s) => s.effectiveShopId());
   const { data, isLoading } = useQuery({
-    queryKey: ['reports', 'margins'],
-    queryFn: () => api.get('/reports/margins').then((r) => r.data),
+    queryKey: ['reports', 'margins', shopId],
+    queryFn: () => api.get(`/reports/margins${shopId ? `?shopId=${shopId}` : ''}`).then((r) => r.data),
   });
 
   const rows = data ?? [];

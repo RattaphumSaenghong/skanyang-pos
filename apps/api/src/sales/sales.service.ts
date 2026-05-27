@@ -1,22 +1,47 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PaymentMethod } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { QuotationEmailService } from '../quotations/quotation-email.service';
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: QuotationEmailService,
+  ) {}
 
-  async checkout(quotationId: string, paymentMethod: PaymentMethod, userId: string, shopId: string) {
+  async checkout(quotationId: string, paymentMethod: PaymentMethod, userId: string, customerEmail?: string) {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: quotationId },
       include: { items: { include: { product: true } } },
     });
     if (!quotation) throw new NotFoundException('Quotation not found');
+    if (quotation.status === 'CONVERTED') throw new BadRequestException('Quotation already converted');
 
     const unitPrice = (item: any) =>
       paymentMethod === 'CARD' ? item.unitPriceCard
       : paymentMethod === 'ZERO_PCT' ? item.unitPriceZeroPct
       : item.unitPriceCash;
+
+    // Check all items have sufficient stock before decrementing any
+    for (const item of quotation.items) {
+      const stock = await this.prisma.stockItem.findUnique({
+        where: { shopId_productId: { shopId: quotation.shopId, productId: item.productId } },
+      });
+      if ((stock?.qtyOnHand ?? 0) < item.qty) {
+        throw new BadRequestException(
+          `สต็อกไม่เพียงพอสำหรับ productId ${item.productId} (มี ${stock?.qtyOnHand ?? 0} ชิ้น ต้องการ ${item.qty})`,
+        );
+      }
+    }
+
+    // All checks passed — decrement stock for each item
+    for (const item of quotation.items) {
+      await this.prisma.stockItem.update({
+        where: { shopId_productId: { shopId: quotation.shopId, productId: item.productId } },
+        data: { qtyOnHand: { decrement: item.qty } },
+      });
+    }
 
     const saleItems = await Promise.all(
       quotation.items.map(async (item) => {
@@ -59,15 +84,8 @@ export class SalesService {
       include: { items: true },
     });
 
-    // Deduct stock and release reservation
+    // Log stock movements (stock already decremented atomically during the check above)
     for (const item of saleItems) {
-      await this.prisma.stockItem.updateMany({
-        where: { shopId: quotation.shopId, productId: item.productId },
-        data: {
-          qtyOnHand: { decrement: item.qty },
-          qtyReserved: { decrement: item.qty },
-        },
-      });
       await this.prisma.stockMovement.create({
         data: {
           shopId: quotation.shopId,
@@ -85,6 +103,21 @@ export class SalesService {
       data: { status: 'CONVERTED' },
     });
 
+    // Clear from customer display
+    await this.prisma.shop.updateMany({
+      where: { id: quotation.shopId, activeDisplayQuotationId: quotationId },
+      data: { activeDisplayQuotationId: null },
+    });
+
+    if (customerEmail) {
+      try {
+        const shop = await this.prisma.shop.findUnique({ where: { id: quotation.shopId } });
+        await this.emailService.send(quotation, shop, customerEmail);
+      } catch {
+        // Email failure is non-fatal — sale is already committed
+      }
+    }
+
     return sale;
   }
 
@@ -99,8 +132,20 @@ export class SalesService {
   }
 
   async createManual(dto: { productId: string; qty: number; unitPrice: number; paymentMethod: PaymentMethod; note?: string; shopId: string }, userId: string) {
+    // Atomic stock check + decrement before creating the sale
+    const stockResult = await this.prisma.stockItem.updateMany({
+      where: { shopId: dto.shopId, productId: dto.productId, qtyOnHand: { gte: dto.qty } },
+      data: { qtyOnHand: { decrement: dto.qty } },
+    });
+    if (stockResult.count === 0) {
+      const stock = await this.prisma.stockItem.findUnique({
+        where: { shopId_productId: { shopId: dto.shopId, productId: dto.productId } },
+      });
+      throw new BadRequestException(`สต็อกไม่เพียงพอ (มี ${stock?.qtyOnHand ?? 0} ชิ้น)`);
+    }
+
     const priceEntry = await this.prisma.priceEntry.findFirst({
-      where: { productId: dto.productId, priceList: { isActive: true } },
+      where: { productId: dto.productId, priceList: { shopId: dto.shopId, isActive: true } },
     });
     const cost = priceEntry ? (priceEntry.costPromo ?? priceEntry.costNormal) : 0;
 
@@ -130,11 +175,6 @@ export class SalesService {
       include: { items: true },
     });
 
-    await this.prisma.stockItem.updateMany({
-      where: { shopId: dto.shopId, productId: dto.productId },
-      data: { qtyOnHand: { decrement: dto.qty } },
-    });
-
     await this.prisma.stockMovement.create({
       data: {
         shopId: dto.shopId,
@@ -150,15 +190,20 @@ export class SalesService {
     return sale;
   }
 
-  findByShop(shopId: string) {
+  findByShop(shopId: string | null, dateFrom?: Date, dateTo?: Date) {
     return this.prisma.sale.findMany({
-      where: { shopId },
+      where: {
+        ...(shopId ? { shopId } : {}),
+        ...(dateFrom || dateTo
+          ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } }
+          : {}),
+      },
       include: {
-        items: { include: { product: true } },
+        items: { include: { product: { select: { sku: true, sizeNormalized: true } } } },
         servedBy: { select: { username: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 500,
     });
   }
 }

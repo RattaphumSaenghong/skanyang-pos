@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { parsePriceListExcel } from '../common/excel/price-list-parser';
+import { parsePriceListExcel, extractRowImages } from '../common/excel/price-list-parser';
 import { createClient } from '@supabase/supabase-js';
 
 const THAI_MONTHS: Record<string, number> = {
@@ -8,7 +8,6 @@ const THAI_MONTHS: Record<string, number> = {
   กรกฎา: 7, สิงหา: 8, กันยา: 9, ตุลา: 10, พฤศจิกา: 11, ธันวา: 12,
 };
 
-// Map model prefix → brand
 const BRAND_MAP: Record<string, string> = {
   XCD: 'MICHELIN', AGI: 'MICHELIN', AGILIS: 'MICHELIN',
   PS: 'MICHELIN', TOUR: 'MICHELIN', PRIM: 'MICHELIN', PILOT: 'MICHELIN',
@@ -26,15 +25,12 @@ function inferBrand(model: string): string {
 }
 
 function detectMonth(sheetName: string, filename: string): { month: number; year: number } {
-  // Try sheet name first, then filename
   const sources = [sheetName, filename];
   for (const src of sources) {
     for (const [thai, m] of Object.entries(THAI_MONTHS)) {
       if (src.includes(thai)) {
         const yearMatch = src.match(/\d{2,4}/);
         const rawYear = yearMatch ? parseInt(yearMatch[0]) : new Date().getFullYear() % 100;
-        // Thai files use 2-digit Buddhist Era shorthand (e.g. "69" = BE 2569 = CE 2026)
-        // Full BE (>2400): subtract 543. 2-digit BE (<100): add 2500 then subtract 543 (= +1957). 4-digit CE: use as-is.
         const year = rawYear > 2400 ? rawYear - 543 : rawYear < 100 ? rawYear + 1957 : rawYear;
         return { month: m, year };
       }
@@ -54,7 +50,7 @@ function getSupabase() {
 export class PriceListsService {
   constructor(private prisma: PrismaService) {}
 
-  async import(file: Express.Multer.File, importedBy: string) {
+  async import(file: Express.Multer.File, importedBy: string, shopId: string) {
     if (!file?.buffer) throw new BadRequestException('ไม่พบไฟล์');
 
     const { rows, sheetName, skipped, errors } = parsePriceListExcel(file.buffer);
@@ -69,7 +65,6 @@ export class PriceListsService {
     const { month, year } = detectMonth(sheetName, file.originalname);
     const name = file.originalname.replace(/\.[^/.]+$/, '');
 
-    // Upload to Supabase Storage (optional — requires SUPABASE_SERVICE_ROLE_KEY)
     let fileUrl: string | null = null;
     try {
       const supabase = getSupabase();
@@ -84,11 +79,11 @@ export class PriceListsService {
         }
       }
     } catch {
-      // Storage upload failure is non-fatal
+      // non-fatal
     }
 
     const priceList = await this.prisma.priceList.create({
-      data: { name, month, year, importedBy, fileUrl },
+      data: { shopId, name, month, year, importedBy, fileUrl },
     });
 
     let saved = 0;
@@ -96,13 +91,15 @@ export class PriceListsService {
 
     for (const row of rows) {
       try {
-        const sku = `${row.model.toUpperCase()}-${row.sizeNormalized}`;
+        const setSuffix = row.isSetPricing ? '-SET' : '';
+        const sku = `${row.model.toUpperCase()}-${row.sizeNormalized}${setSuffix}`;
         const brand = inferBrand(row.model);
 
-        let product = await this.prisma.product.findUnique({ where: { sku } });
+        let product = await this.prisma.product.findUnique({ where: { shopId_sku: { shopId, sku } } });
         if (!product) {
           product = await this.prisma.product.create({
             data: {
+              shopId,
               sku,
               brand,
               model: row.model,
@@ -113,13 +110,15 @@ export class PriceListsService {
               sizeRaw: row.sizeRaw,
               isSetPricing: row.isSetPricing,
               dotYear: row.dotYear,
+              sortOrder: row.sortOrder,
             },
           });
+        } else {
+          await this.prisma.product.update({
+            where: { id: product.id },
+            data: { sortOrder: row.sortOrder },
+          });
         }
-
-        const effectiveCost = row.costPromo ?? row.costNormal;
-        const marginCash = effectiveCost > 0 ? (row.priceCash - effectiveCost) / effectiveCost : null;
-        const marginBulk = effectiveCost > 0 ? (row.priceBulk - effectiveCost) / effectiveCost : null;
 
         await this.prisma.priceEntry.upsert({
           where: { priceListId_productId: { priceListId: priceList.id, productId: product.id } },
@@ -138,8 +137,10 @@ export class PriceListsService {
             discCard: row.discCard,
             discCash: row.discCash,
             discPromo: row.discPromo,
-            marginCash,
-            marginBulk,
+            marginCash: row.marginCash,
+            marginCard: row.marginCard,
+            marginZeroPct: row.marginZeroPct,
+            marginBulk: row.marginBulk,
           },
           update: {
             costNormal: row.costNormal,
@@ -150,14 +151,45 @@ export class PriceListsService {
             priceZeroPct: row.priceZeroPct,
             priceBulk: row.priceBulk,
             marketArp: row.arp,
-            marginCash,
-            marginBulk,
+            marginCash: row.marginCash,
+            marginCard: row.marginCard,
+            marginZeroPct: row.marginZeroPct,
+            marginBulk: row.marginBulk,
           },
         });
         saved++;
       } catch (e) {
         saveErrors.push(`${row.model} ${row.sizeNormalized}: ${e}`);
       }
+    }
+
+    // Extract and upload product images (non-fatal)
+    try {
+      const imageMap = await extractRowImages(file.buffer);
+      if (imageMap.size > 0) {
+        const supabase = getSupabase();
+        if (supabase) {
+          for (const [rowIdx, img] of imageMap) {
+            const row = rows.find((r) => r.rowIndex === rowIdx);
+            if (!row) continue;
+            const setSuffix = row.isSetPricing ? '-SET' : '';
+            const sku = `${row.model.toUpperCase()}-${row.sizeNormalized}${setSuffix}`;
+            const product = await this.prisma.product.findUnique({ where: { shopId_sku: { shopId, sku } } });
+            if (!product) continue;
+            const safeSku = sku.replace(/[^a-zA-Z0-9-]/g, '_');
+            const imgPath = `product-images/${shopId}/${safeSku}.${img.ext}`;
+            const { error } = await supabase.storage
+              .from('product-images')
+              .upload(imgPath, img.data, { contentType: `image/${img.ext}`, upsert: true });
+            if (!error) {
+              const { data } = supabase.storage.from('product-images').getPublicUrl(imgPath);
+              await this.prisma.product.update({ where: { id: product.id }, data: { imageUrl: data.publicUrl } });
+            }
+          }
+        }
+      }
+    } catch {
+      // non-fatal — images are optional
     }
 
     return {
@@ -172,18 +204,99 @@ export class PriceListsService {
     };
   }
 
-  findAll() {
+  findAll(shopId: string) {
     return this.prisma.priceList.findMany({
+      where: { shopId },
       orderBy: { importedAt: 'desc' },
       include: { _count: { select: { entries: true } } },
     });
   }
 
   async activate(id: string) {
-    const exists = await this.prisma.priceList.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException('ไม่พบรายการราคา');
-    await this.prisma.priceList.updateMany({ data: { isActive: false } });
-    return this.prisma.priceList.update({ where: { id }, data: { isActive: true } });
+    const incoming = await this.prisma.priceList.findUnique({
+      where: { id },
+      include: { entries: { select: { productId: true } } },
+    });
+    if (!incoming) throw new NotFoundException('ไม่พบรายการราคา');
+
+    const { shopId } = incoming;
+    const incomingProductIds = new Set(incoming.entries.map((e) => e.productId));
+
+    // Deactivate products for this shop not in the new sheet
+    await this.prisma.product.updateMany({
+      where: { shopId, id: { notIn: [...incomingProductIds] } },
+      data: { active: false },
+    });
+
+    // Re-activate returning products
+    await this.prisma.product.updateMany({
+      where: { shopId, id: { in: [...incomingProductIds] }, active: false },
+      data: { active: true },
+    });
+
+    // Deactivate all price lists for this shop, then activate the selected one
+    await this.prisma.priceList.updateMany({ where: { shopId }, data: { isActive: false } });
+    const activated = await this.prisma.priceList.update({ where: { id }, data: { isActive: true } });
+
+    // Seed StockItem rows for this shop × all products in new sheet
+    const productIds = [...incomingProductIds];
+    if (productIds.length > 0) {
+      await this.prisma.stockItem.createMany({
+        data: productIds.map((productId) => ({ shopId, productId, qtyOnHand: 0 })),
+        skipDuplicates: true,
+      });
+    }
+
+    return activated;
+  }
+
+  async findActiveEntries(shopId: string) {
+    const pl = await this.prisma.priceList.findFirst({
+      where: { shopId, isActive: true },
+      select: { id: true, name: true, month: true, year: true },
+    });
+    if (!pl) throw new NotFoundException('ไม่มีรายการราคาที่ใช้งานอยู่');
+
+    const entries = await this.prisma.priceEntry.findMany({
+      where: { priceListId: pl.id },
+      select: {
+        id: true,
+        priceCash: true,
+        priceCard: true,
+        priceZeroPct: true,
+        priceListed: true,
+        costNormal: true,
+        costPromo: true,
+        marginCash: true,
+        product: {
+          select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, isSetPricing: true, dotYear: true, active: true, imageUrl: true },
+        },
+      },
+      orderBy: [{ product: { sortOrder: 'asc' } }],
+    });
+
+    return { priceList: pl, entries };
+  }
+
+  async updateEntry(entryId: string, data: { priceCash?: number; priceCard?: number; priceZeroPct?: number }) {
+    const entry = await this.prisma.priceEntry.findUnique({
+      where: { id: entryId },
+      select: { costNormal: true, costPromo: true },
+    });
+    if (!entry) throw new NotFoundException('ไม่พบรายการราคา');
+
+    const cost = entry.costPromo ?? entry.costNormal;
+    const updates: any = { ...data };
+
+    if (data.priceCash !== undefined) {
+      updates.marginCash = cost > 0
+        ? parseFloat(((data.priceCash - cost) / data.priceCash * 100).toFixed(2))
+        : null;
+      updates.marginCard = null;
+      updates.marginZeroPct = null;
+    }
+
+    return this.prisma.priceEntry.update({ where: { id: entryId }, data: updates });
   }
 
   async deactivate(id: string) {
@@ -195,7 +308,6 @@ export class PriceListsService {
     if (!exists) throw new NotFoundException('ไม่พบรายการราคา');
     if (exists.isActive) throw new BadRequestException('ไม่สามารถลบรายการที่กำลังใช้งานอยู่ได้');
 
-    // Delete storage file if exists
     if (exists.fileUrl) {
       try {
         const supabase = getSupabase();
@@ -213,12 +325,27 @@ export class PriceListsService {
     return { deleted: true };
   }
 
-  async findActive() {
+  async findActive(shopId: string) {
     const pl = await this.prisma.priceList.findFirst({
-      where: { isActive: true },
+      where: { shopId, isActive: true },
       include: { entries: { include: { product: true } } },
     });
     if (!pl) throw new NotFoundException('ไม่มีรายการราคาที่ใช้งานอยู่');
     return pl;
+  }
+
+  async purgeOrphans(shopId: string) {
+    const pl = await this.prisma.priceList.findFirst({
+      where: { shopId, isActive: true },
+      select: { entries: { select: { productId: true } } },
+    });
+    if (!pl) throw new NotFoundException('ไม่มีรายการราคาที่ใช้งานอยู่');
+
+    const activeProductIds = pl.entries.map((e) => e.productId);
+    const { count } = await this.prisma.product.updateMany({
+      where: { shopId, id: { notIn: activeProductIds }, active: true },
+      data: { active: false },
+    });
+    return { deactivated: count };
   }
 }

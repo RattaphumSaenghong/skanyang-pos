@@ -43,8 +43,9 @@ export class StockController {
   saveSnapshot(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() body: { entries: { entryId: string; qtyActual: number }[] },
+    @Body() body: { shopId?: string; entries: { entryId: string; qtyActual: number }[] },
   ) {
-    return this.service.saveSnapshot(id, user.shopId ?? '', body.entries);
+    const shopId = user.role === 'OWNER' ? (body.shopId ?? '') : (user.shopId ?? '');
+    return this.service.saveSnapshot(id, shopId, body.entries);
   }
 }

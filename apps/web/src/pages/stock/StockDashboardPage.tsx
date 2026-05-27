@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -12,7 +12,9 @@ interface StockItem {
   id: string;
   shopId: string;
   qtyOnHand: number;
-  product: { id: string; sku: string; sizeNormalized: string; brand: string; model: string };
+  qtyReserved: number;
+  shop: { id: string; name: string };
+  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; dotYear: string | null; isSetPricing: boolean };
 }
 
 interface SnapshotEntry {
@@ -20,7 +22,10 @@ interface SnapshotEntry {
   snapshotId: string;
   productId: string;
   sku: string;
+  brand: string;
+  model: string;
   sizeNormalized: string;
+  dotYear: string | null;
   qtyActual: number;
   qtySystem: number;
 }
@@ -39,13 +44,17 @@ type Tab = 'today' | 'snapshot';
 
 export default function StockDashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const globalShopId = useAuthStore((s) => s.effectiveShopId());
   const isOwner = user?.role === 'OWNER';
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>('today');
-  const [shopFilter, setShopFilter] = useState<string>(user?.shopId ?? '');
-  // Track optimistic qty deltas per productId
-  const [pending, setPending] = useState<Record<string, number>>({});
+  const [shopFilter, setShopFilter] = useState<string>(globalShopId ?? '');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [displayDeltas, setDisplayDeltas] = useState<Record<string, number>>({});
+  const accDeltas = useRef<Record<string, number>>({});
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Snapshot tab state
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
@@ -58,6 +67,7 @@ export default function StockDashboardPage() {
   });
 
   const effectiveShopId = isOwner ? shopFilter : (user?.shopId ?? '');
+  useEffect(() => { setPage(1); }, [search, effectiveShopId]);
 
   const { data, isLoading, error } = useQuery<StockItem[]>({
     queryKey: ['stock', effectiveShopId],
@@ -66,33 +76,42 @@ export default function StockDashboardPage() {
     enabled: activeTab === 'today',
   });
 
-  const adjustMutation = useMutation({
-    mutationFn: (body: { productId: string; shopId: string; qty: number; note: string }) =>
-      api.post('/stock/adjust', body).then((r) => r.data),
-    onMutate: ({ productId, qty }) => {
-      setPending((prev) => ({ ...prev, [productId]: (prev[productId] ?? 0) + qty }));
-    },
-    onSettled: (_data, _err, { productId, qty }) => {
-      setPending((prev) => {
-        const next = { ...prev, [productId]: (prev[productId] ?? 0) - qty };
-        if (next[productId] === 0) delete next[productId];
-        return next;
-      });
-      qc.invalidateQueries({ queryKey: ['stock'] });
-    },
-  });
-
   const handleAdjust = (item: StockItem, qty: number) => {
     const shopId = isOwner ? (shopFilter || item.shopId) : (user?.shopId ?? item.shopId);
-    adjustMutation.mutate({
-      productId: item.product.id,
-      shopId,
-      qty,
-      note: 'ปรับจากหน้าสต็อก',
-    });
+    const key = `${shopId}_${item.product.id}`;
+
+    // Floor: don't let display go below zero
+    const currentDisplay = item.qtyOnHand + (accDeltas.current[key] ?? 0);
+    const clamped = qty < 0 ? Math.max(qty, -currentDisplay) : qty;
+    if (clamped === 0) return;
+
+    accDeltas.current[key] = (accDeltas.current[key] ?? 0) + clamped;
+    setDisplayDeltas({ ...accDeltas.current });
+
+    clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(async () => {
+      const total = accDeltas.current[key];
+      if (!total) return;
+      accDeltas.current[key] = 0;
+      try {
+        await api.post('/stock/adjust', { productId: item.product.id, shopId, qty: total, note: 'ปรับจากหน้าสต็อก' });
+      } finally {
+        await qc.invalidateQueries({ queryKey: ['stock'] });
+        setDisplayDeltas((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      }
+    }, 600);
   };
 
   const items = data ?? [];
+  const PAGE_SIZE = 30;
+  const q = search.trim().toLowerCase();
+  const filteredItems = q
+    ? items.filter((item) =>
+        `${item.product.brand} ${item.product.model} ${item.product.sizeNormalized}`.toLowerCase().includes(q)
+      )
+    : items;
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const pagedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // --- Snapshot tab ---
   const { data: snapshots = [], isLoading: snapshotsLoading } = useQuery<StockSnapshot[]>({
@@ -116,7 +135,7 @@ export default function StockDashboardPage() {
 
   const saveSnapshotMutation = useMutation({
     mutationFn: ({ id, entries }: { id: string; entries: { entryId: string; qtyActual: number }[] }) =>
-      api.patch(`/stock/snapshots/${id}`, { entries }).then((r) => r.data),
+      api.patch(`/stock/snapshots/${id}`, { shopId: effectiveShopId || undefined, entries }).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['snapshots'] });
     },
@@ -201,27 +220,52 @@ export default function StockDashboardPage() {
           ) : items.length === 0 ? (
             <p className="text-center text-gray-400 py-16">ยังไม่มีข้อมูลสต็อก</p>
           ) : (
+            <>
+            <div className="mb-4">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหา ยี่ห้อ / รุ่น / ขนาด..."
+                className="w-full max-w-sm border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {q && (
+                <span className="ml-3 text-xs text-gray-400">
+                  พบ {filteredItems.length} รายการ
+                </span>
+              )}
+            </div>
             <div className="bg-white rounded-xl border overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left">SKU</th>
+                    <th className="px-4 py-3 text-left">สินค้า</th>
                     <th className="px-4 py-3 text-left">ขนาด</th>
+                    {!effectiveShopId && <th className="px-4 py-3 text-left">สาขา</th>}
                     <th className="px-4 py-3 text-right">คงเหลือ</th>
                     <th className="px-4 py-3 text-center">ปรับ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {items.map((item) => {
-                    const optimisticQty = item.qtyOnHand + (pending[item.product.id] ?? 0);
+                  {pagedItems.map((item) => {
+                    const optimisticQty = Math.max(0, item.qtyOnHand + (displayDeltas[`${item.shopId}_${item.product.id}`] ?? 0));
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                          {item.product.sku}
+                      <tr key={item.id} className={`hover:bg-gray-50 ${item.product.isSetPricing ? 'bg-pink-50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-800">{item.product.model}</p>
+                          {item.product.dotYear && (
+                            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-mono">DOT {item.product.dotYear}</span>
+                          )}
+                          {item.product.isSetPricing && (
+                            <span className="ml-1 text-xs text-pink-700 bg-pink-100 border border-pink-200 rounded px-1.5 py-0.5 font-bold">ชุด 4</span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-gray-700">
+                        <td className="px-4 py-3 font-mono text-sm text-gray-700">
                           {item.product.sizeNormalized}
                         </td>
+                        {!effectiveShopId && (
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.shop.name}</td>
+                        )}
                         <td className="px-4 py-3 text-right font-mono font-semibold">
                           {optimisticQty}
                         </td>
@@ -249,6 +293,30 @@ export default function StockDashboardPage() {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-xs text-gray-400">
+                  หน้า {page} / {totalPages} ({filteredItems.length} รายการ)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-30"
+                  >
+                    ก่อนหน้า
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-30"
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </>
       )}
@@ -288,7 +356,7 @@ export default function StockDashboardPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left">SKU</th>
+                      <th className="px-4 py-3 text-left">สินค้า</th>
                       <th className="px-4 py-3 text-left">ขนาด</th>
                       <th className="px-4 py-3 text-center">นับจริง</th>
                       <th className="px-4 py-3 text-right">ระบบ</th>
@@ -301,8 +369,13 @@ export default function StockDashboardPage() {
                       const diff = actual - entry.qtySystem;
                       return (
                         <tr key={entry.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{entry.sku}</td>
-                          <td className="px-4 py-3 text-gray-700">{entry.sizeNormalized}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-800">{entry.model}</p>
+                            {entry.dotYear && (
+                              <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-mono">DOT {entry.dotYear}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-sm text-gray-700">{entry.sizeNormalized}</td>
                           <td className="px-4 py-3 text-center">
                             <input
                               type="number"

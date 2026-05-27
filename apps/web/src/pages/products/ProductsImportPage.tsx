@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useAuthStore } from '../../store/auth.store';
 
 interface PriceList {
   id: string;
@@ -14,6 +15,17 @@ interface PriceList {
   _count: { entries: number };
 }
 
+interface Shop {
+  id: string;
+  name: string;
+}
+
+interface DisplayImage {
+  id: string;
+  url: string;
+  sortOrder: number;
+}
+
 interface ImportResult {
   priceListId: string;
   name: string;
@@ -25,24 +37,71 @@ interface ImportResult {
   hasStorage: boolean;
 }
 
+interface ActiveEntry {
+  id: string;
+  priceCash: number;
+  priceCard: number;
+  priceZeroPct: number;
+  priceListed: number;
+  costNormal: number;
+  costPromo: number | null;
+  marginCash: number | null;
+  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; dotYear: string | null };
+}
+
 export default function ProductsImportPage() {
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const effectiveShopId = useAuthStore((s) => s.effectiveShopId());
+  const isOwner = user?.role === 'OWNER';
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [bannerDragging, setBannerDragging] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [bannerShopId, setBannerShopId] = useState<string>(user?.shopId ?? '');
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [entrySearch, setEntrySearch] = useState('');
+  const [localEdits, setLocalEdits] = useState<Record<string, Record<string, string>>>({});
 
   const { data: lists = [], isLoading } = useQuery<PriceList[]>({
-    queryKey: ['price-lists'],
-    queryFn: () => api.get('/price-lists').then((r) => r.data),
+    queryKey: ['price-lists', effectiveShopId],
+    queryFn: () => api.get(`/price-lists?shopId=${effectiveShopId}`).then((r) => r.data),
+    enabled: !!effectiveShopId,
+  });
+
+  const { data: shops = [] } = useQuery<Shop[]>({
+    queryKey: ['shops'],
+    queryFn: () => api.get('/shops').then((r) => r.data),
+    enabled: isOwner,
+    onSuccess: (data) => { if (isOwner && !bannerShopId && data[0]) setBannerShopId(data[0].id); },
+  } as any);
+
+  const effectiveBannerShopId = isOwner ? bannerShopId : (user?.shopId ?? '');
+
+  const { data: banners = [], refetch: refetchBanners } = useQuery<DisplayImage[]>({
+    queryKey: ['banners', effectiveBannerShopId],
+    queryFn: () =>
+      effectiveBannerShopId
+        ? api.get(`/display/${effectiveBannerShopId}/images`).then((r) => r.data)
+        : Promise.resolve([]),
+    enabled: !!effectiveBannerShopId,
+  });
+
+  const deleteBanner = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/display/${effectiveBannerShopId}/images/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['banners', effectiveBannerShopId] }),
   });
 
   const importMutation = useMutation({
     mutationFn: (file: File) => {
       const form = new FormData();
       form.append('file', file);
-      return api.post('/price-lists/import', form).then((r) => r.data);
+      return api.post(`/price-lists/import?shopId=${effectiveShopId}`, form).then((r) => r.data);
     },
     onSuccess: (data: ImportResult) => {
       setResult(data);
@@ -57,7 +116,19 @@ export default function ProductsImportPage() {
 
   const activate = useMutation({
     mutationFn: (id: string) => api.patch(`/price-lists/${id}/activate`).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['price-lists'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['price-lists'] });
+      qc.invalidateQueries({ queryKey: ['active-entries'] });
+    },
+  });
+
+  const purgeOrphans = useMutation({
+    mutationFn: () => api.post(`/price-lists/purge-orphans?shopId=${effectiveShopId}`).then((r) => r.data),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['active-entries', effectiveShopId] });
+      qc.invalidateQueries({ queryKey: ['price-lists', effectiveShopId] });
+      alert(`ลบแล้ว ${data.deactivated} รายการที่ไม่อยู่ในใบราคาปัจจุบัน`);
+    },
   });
 
   const deactivate = useMutation({
@@ -87,6 +158,52 @@ export default function ProductsImportPage() {
     importMutation.mutate(file);
   };
 
+  const handleBannerFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!arr.length || !effectiveBannerShopId) return;
+    setBannerUploading(true);
+    const form = new FormData();
+    arr.forEach((f) => form.append('files', f));
+    await api.post(`/display/${effectiveBannerShopId}/images/batch`, form).catch(() => {});
+    await refetchBanners();
+    setBannerUploading(false);
+  };
+
+  const { data: activeEntriesData } = useQuery<{ priceList: { id: string; name: string }; entries: ActiveEntry[] }>({
+    queryKey: ['active-entries', effectiveShopId],
+    queryFn: () => api.get(`/price-lists/active/entries?shopId=${effectiveShopId}`).then((r) => r.data),
+    enabled: isOwner && !!effectiveShopId,
+  });
+
+  const updateEntry = useMutation({
+    mutationFn: ({ entryId, ...data }: { entryId: string; priceCash?: number; priceCard?: number; priceZeroPct?: number }) =>
+      api.patch(`/price-lists/entries/${entryId}`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['active-entries'] });
+      qc.invalidateQueries({ queryKey: ['price-entries'] });
+    },
+  });
+
+  const getEditVal = (entryId: string, field: string, original: number) =>
+    localEdits[entryId]?.[field] ?? original.toString();
+
+  const handleEntryChange = (entryId: string, field: string, value: string) => {
+    setLocalEdits((prev) => ({ ...prev, [entryId]: { ...prev[entryId], [field]: value } }));
+  };
+
+  const handleEntryBlur = (entryId: string, field: 'priceCash' | 'priceCard' | 'priceZeroPct', original: number) => {
+    const raw = localEdits[entryId]?.[field];
+    if (raw === undefined) return;
+    const val = parseFloat(raw);
+    if (isNaN(val) || val === original) return;
+    updateEntry.mutate({ entryId, [field]: val });
+  };
+
+  const filteredEntries = (activeEntriesData?.entries ?? []).filter((e) => {
+    const q = entrySearch.toLowerCase();
+    return !q || e.product.brand.toLowerCase().includes(q) || e.product.model.toLowerCase().includes(q) || e.product.sizeNormalized.toLowerCase().includes(q);
+  });
+
   const activeList = lists.find((l) => l.isActive);
 
   return (
@@ -102,13 +219,23 @@ export default function ProductsImportPage() {
             <p className="font-semibold text-green-800">{activeList.name}</p>
             <p className="text-xs text-green-600">{activeList._count.entries} รายการ · นำเข้าโดย {activeList.importedBy}</p>
           </div>
-          <button
-            onClick={() => deactivate.mutate(activeList.id)}
-            disabled={deactivate.isPending}
-            className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-100"
-          >
-            ยกเลิกการใช้งาน
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => purgeOrphans.mutate()}
+              disabled={purgeOrphans.isPending}
+              title="ลบสินค้าที่ไม่มีในใบราคานี้ออกจากระบบ (แก้ไขรายการซ้ำ)"
+              className="text-sm text-orange-600 border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-50"
+            >
+              ล้างรายการซ้ำ
+            </button>
+            <button
+              onClick={() => deactivate.mutate(activeList.id)}
+              disabled={deactivate.isPending}
+              className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-100"
+            >
+              ยกเลิกการใช้งาน
+            </button>
+          </div>
         </div>
       )}
 
@@ -170,7 +297,132 @@ export default function ProductsImportPage() {
         </div>
       )}
 
-      {/* List */}
+      {/* Banner upload */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-bold">แบนเนอร์จอลูกค้า</h3>
+          {isOwner && shops.length > 0 && (
+            <select
+              value={bannerShopId}
+              onChange={(e) => setBannerShopId(e.target.value)}
+              className="text-sm border rounded-lg px-3 py-1.5 bg-white"
+            >
+              {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+        </div>
+        <p className="text-sm text-gray-500 mb-4">อัปโหลดรูปภาพ PNG หลายรูปพร้อมกันได้ — จะแสดงสไลด์เลื่อนบนจอลูกค้า</p>
+
+        <div
+          onClick={() => bannerInputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setBannerDragging(true); }}
+          onDragLeave={() => setBannerDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setBannerDragging(false); if (e.dataTransfer.files.length) handleBannerFiles(e.dataTransfer.files); }}
+          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors mb-4 ${
+            bannerDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+          }`}
+        >
+          {bannerUploading ? (
+            <p className="text-blue-600 text-sm font-medium">กำลังอัปโหลด...</p>
+          ) : (
+            <>
+              <p className="text-2xl mb-1">🖼️</p>
+              <p className="font-medium text-gray-700">ลากรูปมาวาง หรือคลิกเพื่อเลือก (เลือกหลายรูปได้)</p>
+              <p className="text-xs text-gray-400 mt-1">PNG, JPG · สูงสุด 5 MB ต่อรูป</p>
+            </>
+          )}
+          <input
+            ref={bannerInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) handleBannerFiles(e.target.files); e.target.value = ''; }}
+          />
+        </div>
+
+        {banners.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {banners.map((img) => (
+              <div key={img.id} className="relative group rounded-lg overflow-hidden border bg-gray-50 aspect-video">
+                <img src={img.url} alt="" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => deleteBanner.mutate(img.id)}
+                  className="absolute top-1 right-1 bg-black/60 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  ลบ
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Inline price editor for active sheet */}
+      {isOwner && activeEntriesData && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold">แก้ไขราคา — {activeEntriesData.priceList.name}</h3>
+            <input
+              className="border rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="ค้นหา ยี่ห้อ / รุ่น / ขนาด..."
+              value={entrySearch}
+              onChange={(e) => setEntrySearch(e.target.value)}
+            />
+          </div>
+          <div className="bg-white rounded-xl border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+                <tr>
+                  <th className="px-3 py-2 text-left">สินค้า</th>
+                  <th className="px-3 py-2 text-left">ขนาด</th>
+                  <th className="px-3 py-2 text-right">เงินสด</th>
+                  <th className="px-3 py-2 text-right">บัตร</th>
+                  <th className="px-3 py-2 text-right">0%</th>
+                  <th className="px-3 py-2 text-right">กำไร%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredEntries.map((e) => {
+                  const cost = e.costPromo ?? e.costNormal;
+                  const cashVal = parseFloat(getEditVal(e.id, 'priceCash', e.priceCash));
+                  const liveMargin = cost > 0 ? ((cashVal - cost) / cost) * 100 : 0;
+                  const warning = liveMargin < 5;
+                  return (
+                    <tr key={e.id} className={`hover:bg-gray-50 ${e.product.isSetPricing ? 'bg-pink-50' : ''}`}>
+                      <td className="px-3 py-2">
+                        <p className="font-medium">{e.product.brand} {e.product.model}</p>
+                        {e.product.dotYear && <p className="text-xs text-gray-400">DOT {e.product.dotYear}</p>}
+                        {e.product.isSetPricing && (
+                          <span className="text-xs bg-pink-100 text-pink-700 border border-pink-200 font-bold px-1.5 rounded">ชุด 4 เส้น</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600 font-mono text-xs">{e.product.sizeNormalized}</td>
+                      {(['priceCash', 'priceCard', 'priceZeroPct'] as const).map((field) => (
+                        <td key={field} className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            className="w-24 text-right border rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            value={getEditVal(e.id, field, e[field])}
+                            onChange={(ev) => handleEntryChange(e.id, field, ev.target.value)}
+                            onBlur={() => handleEntryBlur(e.id, field, e[field])}
+                          />
+                        </td>
+                      ))}
+                      <td className={`px-3 py-2 text-right font-mono text-xs ${warning ? 'text-red-500' : 'text-green-600'}`}>
+                        {liveMargin.toFixed(1)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ใบราคา */}
+      <h3 className="text-lg font-bold mt-10 mb-4">ใบราคา</h3>
       {isLoading ? (
         <p className="text-gray-400 text-sm">กำลังโหลด...</p>
       ) : lists.length === 0 ? (

@@ -1,5 +1,5 @@
 import {
-  Controller, Delete, Get, Param, Patch, Post,
+  Body, Controller, Delete, Get, Param, Patch, Post, Query,
   UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -18,7 +18,7 @@ export class PriceListsController {
   @Roles(Role.OWNER)
   @Post('import')
   @UseInterceptors(FileInterceptor('file', {
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       const ok = /\.xlsx?$/i.test(file.originalname) &&
         ['application/vnd.ms-excel',
@@ -27,18 +27,41 @@ export class PriceListsController {
       cb(ok ? null : new Error('Only .xls / .xlsx files are accepted'), ok);
     },
   }))
-  import(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
-    return this.service.import(file, user.username);
+  import(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: any,
+    @Query('shopId') qShopId?: string,
+  ) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.import(file, user.username, shopId);
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.findAll(shopId);
   }
 
   @Get('active')
-  findActive() {
-    return this.service.findActive();
+  findActive(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.findActive(shopId);
+  }
+
+  @Roles(Role.OWNER)
+  @Get('active/entries')
+  findActiveEntries(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.findActiveEntries(shopId);
+  }
+
+  @Roles(Role.OWNER)
+  @Patch('entries/:entryId')
+  updateEntry(
+    @Param('entryId') entryId: string,
+    @Body() body: { priceCash?: number; priceCard?: number; priceZeroPct?: number },
+  ) {
+    return this.service.updateEntry(entryId, body);
   }
 
   @Roles(Role.OWNER)
@@ -51,6 +74,13 @@ export class PriceListsController {
   @Patch(':id/deactivate')
   deactivate(@Param('id') id: string) {
     return this.service.deactivate(id);
+  }
+
+  @Roles(Role.OWNER)
+  @Post('purge-orphans')
+  purgeOrphans(@CurrentUser() user: any, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
+    return this.service.purgeOrphans(shopId);
   }
 
   @Roles(Role.OWNER)

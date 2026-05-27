@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -13,7 +13,7 @@ export class SalesController {
 
   @Post()
   checkout(@Body() body: any, @CurrentUser() user: any) {
-    return this.service.checkout(body.quotationId, body.paymentMethod, user.id, user.shopId);
+    return this.service.checkout(body.quotationId, body.paymentMethod, user.id, body.customerEmail);
   }
 
   @Post('manual')
@@ -31,7 +31,14 @@ export class SalesController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: any) {
-    return this.service.findByShop(user.shopId);
+  findAll(
+    @CurrentUser() user: any,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    const shopId = user.role === 'OWNER' ? null : user.shopId;
+    const from = dateFrom ? new Date(dateFrom) : undefined;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59`) : undefined;
+    return this.service.findByShop(shopId, from, to);
   }
 }
