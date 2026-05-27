@@ -62,6 +62,7 @@ export default function CustomerDisplayPage() {
   const { shopId } = useParams<{ shopId: string }>();
   const [images, setImages] = useState<DisplayImage[]>([]);
   const [quotation, setQuotation] = useState<ActiveQuotation | null>(null);
+  const [promoText, setPromoText] = useState<string | null>(null);
   const [searchEntries, setSearchEntries] = useState<SearchEntry[] | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
@@ -84,8 +85,11 @@ export default function CustomerDisplayPage() {
     const go = () =>
       fetch(`/api/display/${shopId}/state`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: { mode: string; quotation?: ActiveQuotation } | null) => {
-          if (d !== null) setQuotation(d?.mode === 'quotation' ? (d.quotation ?? null) : null);
+        .then((d: { mode: string; quotation?: ActiveQuotation; promoText?: string | null } | null) => {
+          if (d !== null) {
+            setQuotation(d?.mode === 'quotation' ? (d.quotation ?? null) : null);
+            setPromoText(d?.promoText ?? null);
+          }
         })
         .catch(() => {});
     go();
@@ -287,6 +291,11 @@ export default function CustomerDisplayPage() {
         <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.75rem', marginTop: '1.2rem' }}>
           ราคารวมค่าบริการเปลี่ยน จุ๊ป ถ่วงล้อ ตั้งศูนย์ ลมไนโตรเจน (เปลี่ยน 4 เส้น)
         </p>
+        {promoText && (
+          <p style={{ textAlign: 'center', color: '#374151', fontSize: '0.85rem', marginTop: '0.75rem', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
+            {promoText}
+          </p>
+        )}
       </div>
     </div>
   ) : null;

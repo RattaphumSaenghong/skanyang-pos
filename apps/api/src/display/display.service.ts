@@ -113,7 +113,9 @@ export class DisplayService {
 
   async getState(shopId: string) {
     const quotation = await this.getActiveQuotation(shopId);
-    if (quotation) return { mode: 'quotation', quotation };
+    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoText: true } });
+    const promoText = shop?.promoText ?? null;
+    if (quotation) return { mode: 'quotation', quotation, promoText };
     return { mode: 'slideshow' };
   }
 

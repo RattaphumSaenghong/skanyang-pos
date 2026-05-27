@@ -86,6 +86,12 @@ export default function QuotationPage() {
     queryFn: () => api.get(`/quotations/${id}`).then((r) => r.data),
   });
 
+  const { data: shop } = useQuery({
+    queryKey: ['shop', quotation?.shopId],
+    queryFn: () => api.get(`/shops/${quotation.shopId}`).then((r) => r.data),
+    enabled: !!quotation?.shopId,
+  });
+
   // Keep ref in sync so cleanup closures always read the latest status
   useEffect(() => { quotationRef.current = quotation; }, [quotation]);
 
@@ -239,6 +245,11 @@ export default function QuotationPage() {
         <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.7rem', marginTop: '1rem' }}>
           ราคารวมค่าบริการเปลี่ยน จุ๊ป ถ่วงล้อ ตั้งศูนย์ ลมไนโตรเจน (เปลี่ยน 4 เส้น)
         </p>
+        {shop?.promoText && (
+          <p style={{ textAlign: 'center', color: '#374151', fontSize: '0.8rem', marginTop: '0.75rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            {shop.promoText}
+          </p>
+        )}
       </div>
     </div>
   );

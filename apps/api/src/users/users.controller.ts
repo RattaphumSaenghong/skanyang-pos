@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -25,6 +25,11 @@ export class UsersController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.users.findOne(id);
+  }
+
+  @Patch(':id/password')
+  changePassword(@Param('id') id: string, @Body() body: { password: string }) {
+    return this.users.changePassword(id, body.password);
   }
 
   @Delete(':id')
