@@ -201,26 +201,26 @@ export default function QuotationPage() {
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
     <div ref={printRef} className="absolute -left-[9999px] top-0 w-[960px] print:static print:left-auto print:top-auto print:w-full print:block p-8 font-sans">
-      <div style={{ maxWidth: 900, margin: '0 auto', border: '1px solid #e5e7eb', borderRadius: 12, padding: '2rem 2.5rem' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', border: '2px solid #6b7280', borderRadius: 12, padding: '2rem 2.5rem' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
-          <p style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #9ca3af', paddingBottom: '1rem' }}>
+          <p style={{ fontSize: '0.68rem', color: '#374151', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
           <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
-          <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
-          <p style={{ fontSize: '0.82rem', color: '#374151' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
-          <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '0.85rem' }}>
-            <span style={{ color: '#6b7280' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
-            {plateNumber && <span style={{ color: '#6b7280' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
+          <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
+          <p style={{ fontSize: '0.82rem', color: '#111' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+          <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid #9ca3af', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '0.85rem' }}>
+            <span style={{ color: '#374151' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
+            {plateNumber && <span style={{ color: '#374151' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
           </div>
-          {notes && <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>หมายเหตุ: {notes}</p>}
+          {notes && <p style={{ fontSize: '0.8rem', color: '#374151', marginTop: 4 }}>หมายเหตุ: {notes}</p>}
         </div>
 
         {/* Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-          <thead style={{ background: '#f9fafb' }}>
+          <thead style={{ background: '#e5e7eb' }}>
             <tr>
               {['No', 'รุ่น / ขนาด', 'ราคาปก', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'หมายเหตุ'].map((h) => (
-                <th key={h} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'รุ่น / ขนาด' || h === 'หมายเหตุ' ? 'left' : 'right', color: '#6b7280', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>
+                <th key={h} style={{ border: '1px solid #6b7280', padding: '7px 9px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'รุ่น / ขนาด' || h === 'หมายเหตุ' ? 'left' : 'right', color: '#111', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700 }}>
                   {h}
                 </th>
               ))}
@@ -232,10 +232,10 @@ export default function QuotationPage() {
               return rows.map((row, rowIdx) => {
                 const spanCell = (content: React.ReactNode, extraStyle?: React.CSSProperties) => (
                   <td style={{
-                    borderLeft: '1px solid #e5e7eb',
-                    borderRight: '1px solid #e5e7eb',
-                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #e5e7eb' : 'none',
-                    borderTop: rowIdx === 0 ? '1px solid #e5e7eb' : 'none',
+                    borderLeft: '1px solid #6b7280',
+                    borderRight: '1px solid #6b7280',
+                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #6b7280' : 'none',
+                    borderTop: rowIdx === 0 ? '1px solid #6b7280' : 'none',
                     padding: '7px 9px',
                     verticalAlign: 'middle',
                     ...extraStyle,
@@ -244,26 +244,26 @@ export default function QuotationPage() {
                   </td>
                 );
                 return (
-                  <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
+                  <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fce7f3' : row.label === 'บัตร' ? '#dbeafe' : '#dcfce7' }}>
                     {spanCell(idx + 1, { textAlign: 'center', fontWeight: 600 })}
                     {spanCell(
                       <>
                         <p style={{ fontWeight: 700 }}>{item.product?.model}</p>
-                        <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: 2 }}>
+                        <p style={{ color: '#374151', fontSize: '0.75rem', marginTop: 2 }}>
                           {item.product?.sizeNormalized}
-                          {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #fbcfe8', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                          {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
                         </p>
                       </>,
                       { padding: '8px 10px' }
                     )}
                     {spanCell((item.priceListed ?? 0).toLocaleString(), { textAlign: 'right', fontFamily: 'monospace' })}
                     {spanCell((item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—', { textAlign: 'right', fontFamily: 'monospace' })}
-                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{(row.discCard + row.discCash) > 0 ? (row.discCard + row.discCash).toLocaleString() : '—'}</td>
-                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{row.discPromo > 0 ? row.discPromo.toLocaleString() : '—'}</td>
-                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{row.unitPrice.toLocaleString()}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{(row.discCard + row.discCash) > 0 ? (row.discCard + row.discCash).toLocaleString() : '—'}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{row.discPromo > 0 ? row.discPromo.toLocaleString() : '—'}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{row.unitPrice.toLocaleString()}</td>
                     {spanCell(item.qty, { textAlign: 'center', fontWeight: 700 })}
-                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>{(row.unitPrice * item.qty).toLocaleString()}</td>
-                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', color: '#6b7280', fontSize: '0.75rem' }}>{row.note}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>{(row.unitPrice * item.qty).toLocaleString()}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', color: '#374151', fontSize: '0.75rem' }}>{row.note}</td>
                   </tr>
                 );
               });
@@ -272,14 +272,14 @@ export default function QuotationPage() {
         </table>
 
         {/* Footer */}
-        <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.85rem' }}>
+        <div style={{ marginTop: '1rem', borderTop: '2px solid #9ca3af', paddingTop: '0.85rem' }}>
           {shop?.promoText && (
-            <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '0.8rem', color: '#111', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #9ca3af', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
               {shop.promoText}
             </p>
           )}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
-            <ol style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.9 }}>
+            <ol style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.72rem', color: '#374151', lineHeight: 1.9 }}>
               <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
               <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
               <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
