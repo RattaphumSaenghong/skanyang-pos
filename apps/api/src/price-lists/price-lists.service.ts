@@ -93,7 +93,7 @@ export class PriceListsService {
       try {
         const setSuffix = row.isSetPricing ? '-SET' : '';
         const sku = `${row.model.toUpperCase()}-${row.sizeNormalized}${setSuffix}`;
-        const brand = inferBrand(row.model);
+        const brand = row.brand || inferBrand(row.model);
 
         let product = await this.prisma.product.findUnique({ where: { shopId_sku: { shopId, sku } } });
         if (!product) {
@@ -118,6 +118,7 @@ export class PriceListsService {
           await this.prisma.product.update({
             where: { id: product.id },
             data: {
+              brand,
               sortOrder: row.sortOrder,
               ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
             },
