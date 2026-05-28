@@ -23,7 +23,7 @@ export default function UsersSettingsPage() {
   });
 
   const create = useMutation({
-    mutationFn: () => api.post('/users', form),
+    mutationFn: () => api.post('/users', { ...form, shopId: form.shopId || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowForm(false);
@@ -151,6 +151,15 @@ export default function UsersSettingsPage() {
                 <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
                   <option value="STAFF">STAFF</option>
                   <option value="OWNER">OWNER</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">ร้าน <span className="text-gray-400 font-normal">(ไม่บังคับ)</span></label>
+                <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.shopId} onChange={(e) => setForm((f) => ({ ...f, shopId: e.target.value }))}>
+                  <option value="">-- ไม่ระบุ --</option>
+                  {shops.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
                 </select>
               </div>
               <button onClick={() => create.mutate()} disabled={create.isPending} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm w-full">
