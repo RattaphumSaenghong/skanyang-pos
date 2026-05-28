@@ -317,9 +317,12 @@ export default function CustomerDisplayPage() {
               <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
             </ol>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-              {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
-              ))}
+              <img src="/payment-icons/krungsri.png" alt="krungsri" style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <img src="/payment-icons/aeon.png" alt="aeon" style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
+                <img src="/payment-icons/ktc.png" alt="ktc" style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
+              </div>
+              <img src="/payment-icons/kbank-smartpay.png" alt="kbank-smartpay" style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
             </div>
           </div>
         </div>

@@ -285,9 +285,12 @@ export default function QuotationPage() {
               <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
             </ol>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-              {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
-              ))}
+              <img src="/payment-icons/krungsri.png" alt="krungsri" style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
+              <div style={{ display: 'flex', gap: 4 }}>
+                <img src="/payment-icons/aeon.png" alt="aeon" style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
+                <img src="/payment-icons/ktc.png" alt="ktc" style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
+              </div>
+              <img src="/payment-icons/kbank-smartpay.png" alt="kbank-smartpay" style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
             </div>
           </div>
         </div>
@@ -521,14 +524,12 @@ export default function QuotationPage() {
             <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
           </ol>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-              <img
-                key={name}
-                src={`/payment-icons/${name}.png`}
-                alt={name}
-                className="h-8 w-auto object-contain rounded"
-              />
-            ))}
+            <img src="/payment-icons/krungsri.png" alt="krungsri" className="h-8 w-auto object-contain rounded" />
+            <div className="flex gap-1.5">
+              <img src="/payment-icons/aeon.png" alt="aeon" className="h-8 w-auto object-contain rounded" />
+              <img src="/payment-icons/ktc.png" alt="ktc" className="h-8 w-auto object-contain rounded" />
+            </div>
+            <img src="/payment-icons/kbank-smartpay.png" alt="kbank-smartpay" className="h-8 w-auto object-contain rounded" />
           </div>
         </div>
       </div>
