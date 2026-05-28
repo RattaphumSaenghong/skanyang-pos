@@ -200,11 +200,11 @@ export default function QuotationPage() {
 
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
-    <div ref={printRef} className="print:block p-8 font-sans" style={{ position: 'absolute', left: '-9999px', top: 0, width: 960 }}>
+    <div ref={printRef} className="absolute -left-[9999px] top-0 w-[960px] print:static print:left-auto print:top-auto print:w-full print:block p-8 font-sans">
       <div style={{ maxWidth: 900, margin: '0 auto', border: '1px solid #e5e7eb', borderRadius: 12, padding: '2rem 2.5rem' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
-          <p style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
+          <p style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
           <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
           <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
           <p style={{ fontSize: '0.82rem', color: '#374151' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
