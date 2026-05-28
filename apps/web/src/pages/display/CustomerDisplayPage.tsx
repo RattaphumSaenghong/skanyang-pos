@@ -59,7 +59,7 @@ function SetBadge() {
 }
 
 export default function CustomerDisplayPage() {
-  const { shopId } = useParams<{ shopId: string }>();
+  const { shopId, staffId } = useParams<{ shopId: string; staffId?: string }>();
   const [images, setImages] = useState<DisplayImage[]>([]);
   const [quotation, setQuotation] = useState<ActiveQuotation | null>(null);
   const [promoText, setPromoText] = useState<string | null>(null);
@@ -67,6 +67,13 @@ export default function CustomerDisplayPage() {
   const trackRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const posRef = useRef(0);
+
+  const stateUrl = staffId
+    ? `/api/display/${shopId}/${staffId}/state`
+    : `/api/display/${shopId}/state`;
+  const searchUrl = staffId
+    ? `/api/display/${shopId}/${staffId}/search-results`
+    : `/api/display/${shopId}/search-results`;
 
   // Poll images every 8s
   useEffect(() => {
@@ -83,7 +90,7 @@ export default function CustomerDisplayPage() {
   // Poll display state every 3s — switches between slideshow and quotation view
   useEffect(() => {
     const go = () =>
-      fetch(`/api/display/${shopId}/state`)
+      fetch(stateUrl)
         .then((r) => (r.ok ? r.json() : null))
         .then((d: { mode: string; quotation?: ActiveQuotation; promoText?: string | null } | null) => {
           if (d !== null) {
@@ -95,19 +102,19 @@ export default function CustomerDisplayPage() {
     go();
     const t = setInterval(go, 3000);
     return () => clearInterval(t);
-  }, [shopId]);
+  }, [stateUrl]);
 
   // Poll search results every 3s (shown when no active quotation)
   useEffect(() => {
     const go = () =>
-      fetch(`/api/display/${shopId}/search-results`)
+      fetch(searchUrl)
         .then((r) => (r.ok ? r.json() : null))
         .then((d: { results: SearchEntry[] | null } | null) => { if (d !== null) setSearchEntries(d?.results ?? null); })
         .catch(() => {});
     go();
     const t = setInterval(go, 3000);
     return () => clearInterval(t);
-  }, [shopId]);
+  }, [searchUrl]);
 
   // Continuous horizontal scroll
   useEffect(() => {
@@ -172,7 +179,7 @@ export default function CustomerDisplayPage() {
               <tr key={e.id} style={{ borderBottom: '1px solid #1e293b' }}>
                 <td style={{ padding: '14px 16px' }}>
                   <p style={{ fontWeight: 700, fontSize: '1.2rem' }}>
-                    {e.product.brand} {e.product.model}
+                    {e.product.model}
                     {e.product.isSetPricing && <SetBadge />}
                   </p>
                   <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: 2 }}>{e.product.sizeNormalized}</p>
@@ -208,10 +215,18 @@ export default function CustomerDisplayPage() {
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
-          <p style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>ใบเสนอราคา</p>
-          <p style={{ fontSize: '1.7rem', fontWeight: 800, color: '#111', margin: '4px 0' }}>ส.การยาง</p>
-          {quotation.plateNumber && <p style={{ fontSize: '1.1rem', color: '#374151' }}>ทะเบียน: <strong>{quotation.plateNumber}</strong></p>}
-          {quotation.customer && <p style={{ fontSize: '1rem', color: '#6b7280' }}>{quotation.customer.name}</p>}
+          <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
+          <p style={{ fontSize: '1.9rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
+          <p style={{ fontSize: '1rem', color: '#6b7280', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
+          <p style={{ fontSize: '0.95rem', color: '#374151' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+          <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '1rem' }}>
+            <span style={{ color: '#6b7280' }}>
+              วันที่: <strong style={{ color: '#111' }}>{new Date().toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>
+            </span>
+            {quotation.plateNumber && (
+              <span style={{ color: '#6b7280' }}>ทะเบียน: <strong style={{ color: '#111' }}>{quotation.plateNumber}</strong></span>
+            )}
+          </div>
         </div>
 
         {/* Same table structure as staff QuotationPage — read-only */}
@@ -230,7 +245,7 @@ export default function CustomerDisplayPage() {
               const rows = buildPaymentRows(item);
               const isSet = item.isSetPricing || item.product.isSetPricing;
               return rows.map((row, rowIdx) => (
-                <tr key={`${item.id}-${rowIdx}`} style={{ background: isSet ? '#fdf2f8' : 'transparent' }}>
+                <tr key={`${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
                   {rowIdx === 0 && (
                     <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 600 }}>
                       {idx + 1}
@@ -288,14 +303,26 @@ export default function CustomerDisplayPage() {
           </tbody>
         </table>
 
-        <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.75rem', marginTop: '1.2rem' }}>
-          ราคารวมค่าบริการเปลี่ยน จุ๊ป ถ่วงล้อ ตั้งศูนย์ ลมไนโตรเจน (เปลี่ยน 4 เส้น)
-        </p>
-        {promoText && (
-          <p style={{ textAlign: 'center', color: '#374151', fontSize: '0.85rem', marginTop: '0.75rem', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
-            {promoText}
-          </p>
-        )}
+        {/* Fixed disclaimer + payment icons */}
+        <div style={{ marginTop: '1.2rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+          {promoText && (
+            <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+              {promoText}
+            </p>
+          )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1.5rem' }}>
+            <ol style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#6b7280', lineHeight: 1.8 }}>
+              <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
+              <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
+              <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
+            </ol>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
+                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 44, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   ) : null;

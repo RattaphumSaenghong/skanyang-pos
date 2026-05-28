@@ -29,6 +29,7 @@ export interface ParsedPriceRow {
   marginCard: number | null;
   marginZeroPct: number | null;
   marginBulk: number | null;
+  imageUrl: string | null;
 }
 
 export interface ParseResult {
@@ -270,6 +271,11 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
       const marginBulk    = marginBulkRaw !== null
         ? parseFloat((marginBulkRaw * 100).toFixed(2)) : null;
 
+      // AG (col 32) — image URL (plain-text URLs only; embedded pictures are handled by extractRowImages)
+      const imageUrlRaw = v(32);
+      const imageUrlStr = imageUrlRaw ? String(imageUrlRaw).trim() : '';
+      const imageUrl = imageUrlStr.startsWith('http') ? imageUrlStr : null;
+
       rows.push({
         sortOrder: rows.length,
         rowIndex: r,
@@ -298,6 +304,7 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
         marginCard,
         marginZeroPct,
         marginBulk,
+        imageUrl,
       });
     } catch (e) {
       skipped++;

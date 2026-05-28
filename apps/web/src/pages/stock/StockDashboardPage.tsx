@@ -17,6 +17,13 @@ interface StockItem {
   product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; dotYear: string | null; isSetPricing: boolean };
 }
 
+interface SnapshotMovement {
+  qty: number;
+  type: string;
+  note: string | null;
+  createdAt: string;
+}
+
 interface SnapshotEntry {
   id: string;
   snapshotId: string;
@@ -28,6 +35,8 @@ interface SnapshotEntry {
   dotYear: string | null;
   qtyActual: number;
   qtySystem: number;
+  prevQtySystem: number | null;
+  movements: SnapshotMovement[];
 }
 
 interface StockSnapshot {
@@ -49,12 +58,16 @@ export default function StockDashboardPage() {
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>('today');
+  const [sortByEdited, setSortByEdited] = useState(false);
   const [shopFilter, setShopFilter] = useState<string>(globalShopId ?? '');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [displayDeltas, setDisplayDeltas] = useState<Record<string, number>>({});
   const accDeltas = useRef<Record<string, number>>({});
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<'add' | 'remove'>('add');
+  const [editValue, setEditValue] = useState('');
 
   // Snapshot tab state
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
@@ -285,6 +298,44 @@ export default function StockDashboardPage() {
                             >
                               +
                             </button>
+                            {editingKey === `${item.shopId}_${item.product.id}` ? (
+                              <input
+                                type="number"
+                                min={1}
+                                autoFocus
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseInt(editValue, 10);
+                                    if (!isNaN(val) && val !== 0) {
+                                      handleAdjust(item, editMode === 'add' ? val : -val);
+                                    }
+                                    setEditingKey(null);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingKey(null);
+                                  }
+                                }}
+                                onBlur={() => setEditingKey(null)}
+                                placeholder="จำนวน"
+                                className={`w-20 text-center border-2 rounded-lg px-2 py-0.5 text-sm font-mono focus:outline-none ${editMode === 'add' ? 'border-emerald-400' : 'border-red-400'}`}
+                              />
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => { setEditMode('add'); setEditingKey(`${item.shopId}_${item.product.id}`); setEditValue(''); }}
+                                  className="px-2 py-0.5 text-xs font-medium rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                >
+                                  เพิ่ม
+                                </button>
+                                <button
+                                  onClick={() => { setEditMode('remove'); setEditingKey(`${item.shopId}_${item.product.id}`); setEditValue(''); }}
+                                  className="px-2 py-0.5 text-xs font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  ลบ
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -324,21 +375,33 @@ export default function StockDashboardPage() {
       {activeTab === 'snapshot' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            {snapshots.length > 0 ? (
-              <select
-                value={selectedSnapshotId ?? ''}
-                onChange={(e) => handleSelectSnapshot(e.target.value)}
-                className="text-sm border rounded-lg px-3 py-1.5 bg-white"
+            <div className="flex items-center gap-2">
+              {snapshots.length > 0 ? (
+                <select
+                  value={selectedSnapshotId ?? ''}
+                  onChange={(e) => handleSelectSnapshot(e.target.value)}
+                  className="text-sm border rounded-lg px-3 py-1.5 bg-white"
+                >
+                  {snapshots.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label ? s.label : 'Snapshot'} — {formatThaiDate(s.takenAt)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-sm text-gray-400">ยังไม่มีสแนปชอต</span>
+              )}
+              <button
+                onClick={() => setSortByEdited((v) => !v)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                  sortByEdited
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                    : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                }`}
               >
-                {snapshots.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label ? s.label : 'Snapshot'} — {formatThaiDate(s.takenAt)}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm text-gray-400">ยังไม่มีสแนปชอต</span>
-            )}
+                {sortByEdited ? 'เรียงตามแก้ไข ✓' : 'เรียงตามแก้ไข'}
+              </button>
+            </div>
             <button
               onClick={() => takeSnapshotMutation.mutate()}
               disabled={takeSnapshotMutation.isPending}
@@ -364,7 +427,10 @@ export default function StockDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {selectedSnapshot.entries.map((entry) => {
+                    {(sortByEdited
+                      ? [...selectedSnapshot.entries].sort((a, b) => (b.movements?.length ?? 0) - (a.movements?.length ?? 0))
+                      : selectedSnapshot.entries
+                    ).map((entry) => {
                       const actual = localQty[entry.id] ?? entry.qtyActual;
                       const diff = actual - entry.qtySystem;
                       return (
@@ -390,7 +456,26 @@ export default function StockDashboardPage() {
                               className="w-20 text-center border rounded px-2 py-1 text-sm font-mono"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right font-mono">{entry.qtySystem}</td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {entry.prevQtySystem != null && entry.movements.length > 0 ? (
+                              <div className="flex items-center justify-end gap-1 flex-wrap text-xs">
+                                <span className="text-gray-500">{entry.prevQtySystem}</span>
+                                {entry.movements.map((m, mi) => (
+                                  <span
+                                    key={mi}
+                                    title={m.note ?? m.type}
+                                    className={`font-semibold ${m.qty > 0 ? 'text-emerald-600' : 'text-red-500'}`}
+                                  >
+                                    {m.qty > 0 ? `+${m.qty}` : m.qty}
+                                  </span>
+                                ))}
+                                <span className="text-gray-400">=</span>
+                                <span className="font-bold text-gray-800">{entry.qtySystem}</span>
+                              </div>
+                            ) : (
+                              entry.qtySystem
+                            )}
+                          </td>
                           <td
                             className={`px-4 py-3 text-right font-mono font-semibold ${
                               diff < 0 ? 'text-red-600' : diff > 0 ? 'text-green-600' : 'text-gray-400'

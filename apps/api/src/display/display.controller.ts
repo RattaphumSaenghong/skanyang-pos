@@ -59,6 +59,44 @@ export class DisplayController {
     return this.service.getState(shopId);
   }
 
+  // ── Per-staff display routes ─────────────────────────────────────────────
+
+  @Get(':shopId/:staffId/state')
+  getStaffState(@Param('shopId') shopId: string, @Param('staffId') staffId: string) {
+    return this.service.getStaffState(shopId, staffId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':shopId/:staffId/active-quotation')
+  setStaffQuotation(
+    @Param('shopId') shopId: string,
+    @Param('staffId') staffId: string,
+    @Body() body: { quotationId: string },
+  ) {
+    return this.service.setStaffQuotation(shopId, staffId, body.quotationId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':shopId/:staffId/active-quotation')
+  clearStaffQuotation(@Param('shopId') shopId: string, @Param('staffId') staffId: string) {
+    return this.service.clearStaffQuotation(shopId, staffId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':shopId/:staffId/search-results')
+  setStaffSearchResults(
+    @Param('shopId') shopId: string,
+    @Param('staffId') staffId: string,
+    @Body() body: { results: any[] | null },
+  ) {
+    return this.service.setStaffSearchResults(shopId, staffId, body.results);
+  }
+
+  @Get(':shopId/:staffId/search-results')
+  getStaffSearchResults(@Param('shopId') shopId: string, @Param('staffId') staffId: string) {
+    return { results: this.service.getStaffSearchResults(shopId, staffId) };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post(':shopId/active-quotation')
   setActiveQuotation(

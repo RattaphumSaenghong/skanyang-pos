@@ -58,12 +58,6 @@ export class QuotationsService {
       include: { items: { include: { product: true } } },
     });
 
-    // Push to customer display
-    await this.prisma.shop.update({
-      where: { id: effectiveShopId },
-      data: { activeDisplayQuotationId: quotation.id },
-    });
-
     return quotation;
   }
 
@@ -137,6 +131,26 @@ export class QuotationsService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+  }
+
+  async cleanupStaleDrafts(shopId: string) {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
+    const stale = await this.prisma.quotation.findMany({
+      where: { shopId, status: 'DRAFT', createdAt: { lt: cutoff } },
+      select: { id: true },
+    });
+    if (stale.length === 0) return { cancelled: 0 };
+
+    const ids = stale.map((q) => q.id);
+    await this.prisma.shop.updateMany({
+      where: { id: shopId, activeDisplayQuotationId: { in: ids } },
+      data: { activeDisplayQuotationId: null },
+    });
+    await this.prisma.quotation.updateMany({
+      where: { id: { in: ids } },
+      data: { status: 'CANCELLED' },
+    });
+    return { cancelled: stale.length };
   }
 
   report(shopId: string | null, dateFrom?: string, dateTo?: string) {

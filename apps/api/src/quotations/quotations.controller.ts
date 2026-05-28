@@ -52,6 +52,13 @@ export class QuotationsController {
     return this.service.cancel(id, user.shopId, user.role);
   }
 
+  @Post('cleanup-stale')
+  cleanupStale(@CurrentUser() user: any) {
+    const shopId = user.shopId;
+    if (!shopId) return { cancelled: 0 };
+    return this.service.cleanupStaleDrafts(shopId);
+  }
+
   @Post(':id/send-email')
   async sendEmail(@Param('id') id: string, @Body('email') email: string) {
     const quotation = await this.service.findOne(id);

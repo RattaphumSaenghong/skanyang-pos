@@ -20,6 +20,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/display/:shopId" element={<CustomerDisplayPage />} />
+        <Route path="/display/:shopId/:staffId" element={<CustomerDisplayPage />} />
         <Route
           path="/"
           element={

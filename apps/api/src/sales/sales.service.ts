@@ -23,26 +23,6 @@ export class SalesService {
       : paymentMethod === 'ZERO_PCT' ? item.unitPriceZeroPct
       : item.unitPriceCash;
 
-    // Check all items have sufficient stock before decrementing any
-    for (const item of quotation.items) {
-      const stock = await this.prisma.stockItem.findUnique({
-        where: { shopId_productId: { shopId: quotation.shopId, productId: item.productId } },
-      });
-      if ((stock?.qtyOnHand ?? 0) < item.qty) {
-        throw new BadRequestException(
-          `สต็อกไม่เพียงพอสำหรับ productId ${item.productId} (มี ${stock?.qtyOnHand ?? 0} ชิ้น ต้องการ ${item.qty})`,
-        );
-      }
-    }
-
-    // All checks passed — decrement stock for each item
-    for (const item of quotation.items) {
-      await this.prisma.stockItem.update({
-        where: { shopId_productId: { shopId: quotation.shopId, productId: item.productId } },
-        data: { qtyOnHand: { decrement: item.qty } },
-      });
-    }
-
     const saleItems = await Promise.all(
       quotation.items.map(async (item) => {
         const priceEntry = await this.prisma.priceEntry.findFirst({
@@ -83,20 +63,6 @@ export class SalesService {
       },
       include: { items: true },
     });
-
-    // Log stock movements (stock already decremented atomically during the check above)
-    for (const item of saleItems) {
-      await this.prisma.stockMovement.create({
-        data: {
-          shopId: quotation.shopId,
-          productId: item.productId,
-          type: 'OUT',
-          qty: -item.qty,
-          referenceId: sale.id,
-          createdBy: userId,
-        },
-      });
-    }
 
     await this.prisma.quotation.update({
       where: { id: quotationId },

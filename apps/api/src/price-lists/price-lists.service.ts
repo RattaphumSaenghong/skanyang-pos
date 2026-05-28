@@ -111,12 +111,16 @@ export class PriceListsService {
               isSetPricing: row.isSetPricing,
               dotYear: row.dotYear,
               sortOrder: row.sortOrder,
+              ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
             },
           });
         } else {
           await this.prisma.product.update({
             where: { id: product.id },
-            data: { sortOrder: row.sortOrder },
+            data: {
+              sortOrder: row.sortOrder,
+              ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
+            },
           });
         }
 
@@ -164,8 +168,12 @@ export class PriceListsService {
     }
 
     // Extract and upload product images (non-fatal)
+    let imagesFound = 0;
+    let imagesUploaded = 0;
+    let imageError: string | null = null;
     try {
       const imageMap = await extractRowImages(file.buffer);
+      imagesFound = imageMap.size;
       if (imageMap.size > 0) {
         const supabase = getSupabase();
         if (supabase) {
@@ -184,13 +192,19 @@ export class PriceListsService {
             if (!error) {
               const { data } = supabase.storage.from('product-images').getPublicUrl(imgPath);
               await this.prisma.product.update({ where: { id: product.id }, data: { imageUrl: data.publicUrl } });
+              imagesUploaded++;
+            } else {
+              imageError = imageError ?? error.message;
             }
           }
+        } else {
+          imageError = 'Supabase not configured';
         }
       }
-    } catch {
-      // non-fatal — images are optional
+    } catch (e) {
+      imageError = String(e);
     }
+    console.log('[IMG]', { imagesFound, imagesUploaded, imageError });
 
     return {
       priceListId: priceList.id,
@@ -201,6 +215,9 @@ export class PriceListsService {
       sheetName,
       errors: [...errors, ...saveErrors].slice(0, 10),
       hasStorage: !!fileUrl,
+      imagesFound,
+      imagesUploaded,
+      imageError,
     };
   }
 

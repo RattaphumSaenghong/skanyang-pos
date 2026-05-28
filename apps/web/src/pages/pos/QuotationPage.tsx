@@ -14,6 +14,12 @@ type PaymentRow = {
   note: string;
 };
 
+function paymentRowClass(label: string): string {
+  if (label === '0%') return 'bg-pink-50 hover:bg-pink-100';
+  if (label === 'บัตร') return 'bg-sky-50 hover:bg-sky-100';
+  return 'bg-emerald-50 hover:bg-emerald-100';
+}
+
 function buildPaymentRows(item: any): PaymentRow[] {
   if (!item.isSetPricing && item.qty % 4 !== 0) {
     return [{
@@ -149,10 +155,11 @@ export default function QuotationPage() {
   });
 
   const pushDisplay = useMutation({
-    mutationFn: () =>
-      api
-        .post(`/display/${quotation?.shopId ?? user?.shopId}/active-quotation`, { quotationId: id })
-        .then((r) => r.data),
+    mutationFn: () => {
+      const shopId = quotation?.shopId ?? user?.shopId;
+      const path = user?.id ? `/display/${shopId}/${user.id}/active-quotation` : `/display/${shopId}/active-quotation`;
+      return api.post(path, { quotationId: id }).then((r) => r.data);
+    },
     onSuccess: () => {
       setDisplayToast(true);
       setTimeout(() => setDisplayToast(false), 3000);
@@ -160,8 +167,11 @@ export default function QuotationPage() {
   });
 
   const stopDisplay = useMutation({
-    mutationFn: () =>
-      api.delete(`/display/${quotation?.shopId ?? user?.shopId}/active-quotation`).then((r) => r.data),
+    mutationFn: () => {
+      const shopId = quotation?.shopId ?? user?.shopId;
+      const path = user?.id ? `/display/${shopId}/${user.id}/active-quotation` : `/display/${shopId}/active-quotation`;
+      return api.delete(path).then((r) => r.data);
+    },
   });
 
   const cancelQuotation = useMutation({
@@ -189,17 +199,21 @@ export default function QuotationPage() {
 
   const qNum = String(quotation.number).padStart(5, '0');
 
-  // ─── Print-only view (matches customer display card) ─────────────────────
+  // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
     <div ref={printRef} className="hidden print:block p-8 font-sans">
       <div style={{ maxWidth: 900, margin: '0 auto', border: '1px solid #e5e7eb', borderRadius: 12, padding: '2rem 2.5rem' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
-          <p style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>ใบเสนอราคา</p>
-          <p style={{ fontSize: '1.5rem', fontWeight: 800, color: '#111', margin: '4px 0' }}>ส.การยาง</p>
-          <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>#{qNum}</p>
-          {plateNumber && <p style={{ fontSize: '1rem', color: '#374151', marginTop: 4 }}>ทะเบียน: <strong>{plateNumber}</strong></p>}
-          {notes && <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 2 }}>หมายเหตุ: {notes}</p>}
+          <p style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
+          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
+          <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
+          <p style={{ fontSize: '0.82rem', color: '#374151' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+          <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '0.85rem' }}>
+            <span style={{ color: '#6b7280' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
+            {plateNumber && <span style={{ color: '#6b7280' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
+          </div>
+          {notes && <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>หมายเหตุ: {notes}</p>}
         </div>
 
         {/* Table */}
@@ -217,7 +231,7 @@ export default function QuotationPage() {
             {items.map((item: any, idx: number) => {
               const rows = buildPaymentRows(item);
               return rows.map((row, rowIdx) => (
-                <tr key={`print-${item.id}-${rowIdx}`} style={{ background: item.isSetPricing ? '#fdf2f8' : 'transparent' }}>
+                <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
                   {rowIdx === 0 && <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 600 }}>{idx + 1}</td>}
                   {rowIdx === 0 && (
                     <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', verticalAlign: 'middle' }}>
@@ -242,14 +256,26 @@ export default function QuotationPage() {
           </tbody>
         </table>
 
-        <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.7rem', marginTop: '1rem' }}>
-          ราคารวมค่าบริการเปลี่ยน จุ๊ป ถ่วงล้อ ตั้งศูนย์ ลมไนโตรเจน (เปลี่ยน 4 เส้น)
-        </p>
-        {shop?.promoText && (
-          <p style={{ textAlign: 'center', color: '#374151', fontSize: '0.8rem', marginTop: '0.75rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-            {shop.promoText}
-          </p>
-        )}
+        {/* Footer */}
+        <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.85rem' }}>
+          {shop?.promoText && (
+            <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+              {shop.promoText}
+            </p>
+          )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+            <ol style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.9 }}>
+              <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
+              <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
+              <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
+            </ol>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
+                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -335,6 +361,26 @@ export default function QuotationPage() {
         </div>
       </div>
 
+      {/* Shop header */}
+      <div className="bg-white rounded-xl border px-6 py-4 mb-4 text-center">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-0.5">ใบเสนอราคา</p>
+        <p className="text-xl font-extrabold text-gray-900 leading-tight">ไทร์พลัส ส.การยางพิษณุโลก</p>
+        <p className="text-sm text-gray-500 mt-0.5">(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
+        <p className="text-sm text-gray-600 mt-1">โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+        <div className="mt-3 pt-3 border-t flex justify-center gap-10 text-sm">
+          <span className="text-gray-500">
+            วันที่:{' '}
+            <span className="font-semibold text-gray-800">
+              {new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </span>
+          </span>
+          <span className="text-gray-500">
+            ทะเบียน:{' '}
+            <span className="font-semibold text-gray-800">{plateNumber || '—'}</span>
+          </span>
+        </div>
+      </div>
+
       {updateItemError && (
         <p className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{updateItemError}</p>
       )}
@@ -360,7 +406,7 @@ export default function QuotationPage() {
             {items.map((item: any, idx: number) => {
               const rows = buildPaymentRows(item);
               return rows.map((row, rowIdx) => (
-                <tr key={`${item.id}-${rowIdx}`} className="hover:bg-gray-50">
+                <tr key={`${item.id}-${rowIdx}`} className={paymentRowClass(row.label)}>
                   {rowIdx === 0 && (
                     <td
                       rowSpan={rows.length}
@@ -372,7 +418,7 @@ export default function QuotationPage() {
                   {rowIdx === 0 && (
                     <td rowSpan={rows.length} className={`border px-2 py-2 align-middle ${item.isSetPricing ? 'bg-pink-50' : ''}`}>
                       <p className="font-medium">
-                        {item.product?.brand} {item.product?.model}
+                        {item.product?.model}
                       </p>
                       <p className="text-gray-500">
                         {item.product?.sizeNormalized}
@@ -444,6 +490,30 @@ export default function QuotationPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Fixed disclaimer + promo text + payment icons */}
+      <div className="bg-white rounded-xl border px-5 py-4 mb-4">
+        {shop?.promoText && (
+          <p className="text-xs text-gray-700 mb-3 pb-3 border-b whitespace-pre-wrap leading-relaxed">
+            {shop.promoText}
+          </p>
+        )}
+        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+          <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
+          <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
+          <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
+        </ol>
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t justify-end">
+          {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
+            <img
+              key={name}
+              src={`/payment-icons/${name}.png`}
+              alt={name}
+              className="h-10 w-auto object-contain rounded"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Footer actions */}

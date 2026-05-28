@@ -96,7 +96,7 @@ model PriceList {
 
 model PriceEntry {
   id          String    @id @default(cuid())
-  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   priceListId String
   product     Product   @relation(fields: [productId], references: [id])
   productId   String

@@ -42,7 +42,7 @@ export default function Layout() {
 
   const handleOpenDisplay = async () => {
     const shopId = user?.shopId ?? shops[0]?.id;
-    if (shopId) window.open(`/display/${shopId}`, '_blank');
+    if (shopId && user?.id) window.open(`/display/${shopId}/${user.id}`, '_blank');
   };
 
   const selectedShop = shops.find((s) => s.id === user?.shopId);

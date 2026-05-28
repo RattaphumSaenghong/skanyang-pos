@@ -27,6 +27,7 @@ export default function PosSearchPage() {
   const [search, setSearch] = useState('');
   const [qty, setQty] = useState<Record<string, number>>({});
   const [displayOn, setDisplayOn] = useState(false);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [createError, setCreateError] = useState<string | null>(null);
 
   const { data, isFetching } = useQuery({
@@ -41,28 +42,42 @@ export default function PosSearchPage() {
   const entries: PriceEntry[] = data ?? [];
 
   const shopId = effectiveShopId;
+  const userId = user?.id;
+  const srUrl = shopId
+    ? userId
+      ? `/display/${shopId}/${userId}/search-results`
+      : `/display/${shopId}/search-results`
+    : null;
+
   useEffect(() => {
-    if (!shopId) return;
-    if (!displayOn) {
-      api.post(`/display/${shopId}/search-results`, { results: null }).catch(() => {});
+    if (!srUrl) return;
+    if (!displayOn || ticked.size === 0) {
+      api.post(srUrl, { results: null }).catch(() => {});
       return;
     }
-    const stripped = entries.map((e) => ({
-      id: e.id,
-      product: e.product,
-      priceCash: e.priceCash,
-      priceCard: e.priceCard,
-      priceZeroPct: e.priceZeroPct,
-    }));
-    api.post(`/display/${shopId}/search-results`, { results: stripped.length ? stripped : null }).catch(() => {});
-  }, [entries, displayOn, shopId]);
+    const stripped = entries
+      .filter((e) => ticked.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        product: e.product,
+        priceCash: e.priceCash,
+        priceCard: e.priceCard,
+        priceZeroPct: e.priceZeroPct,
+      }));
+    api.post(srUrl, { results: stripped.length ? stripped : null }).catch(() => {});
+  }, [entries, displayOn, ticked, srUrl]);
+
+  // Cleanup stale drafts on mount
+  useEffect(() => {
+    api.post('/quotations/cleanup-stale').catch(() => {});
+  }, []);
 
   // Clear display when leaving this page
   useEffect(() => {
     return () => {
-      if (shopId) api.post(`/display/${shopId}/search-results`, { results: null }).catch(() => {});
+      if (srUrl) api.post(srUrl, { results: null }).catch(() => {});
     };
-  }, [shopId]);
+  }, [srUrl]);
 
   const createQuotation = useMutation({
     mutationFn: (items: { priceEntryId: string; qty: number }[]) =>
@@ -124,6 +139,7 @@ export default function PosSearchPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
+                <th className="px-4 py-3 text-center">🖥️</th>
                 <th className="px-4 py-3 text-left">สินค้า</th>
                 <th className="px-4 py-3 text-right">เงินสด</th>
                 <th className="px-4 py-3 text-right">บัตร</th>
@@ -139,9 +155,25 @@ export default function PosSearchPage() {
                 const m = e.marginCash ?? 0;
                 const warning = m < 5;
                 return (
-                  <tr key={e.id} className="hover:bg-gray-50">
+                  <tr key={e.id} className={`hover:bg-gray-50 ${ticked.has(e.id) ? 'bg-indigo-50' : ''}`}>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setTicked((prev) => {
+                          const next = new Set(prev);
+                          next.has(e.id) ? next.delete(e.id) : next.add(e.id);
+                          return next;
+                        })}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-colors ${
+                          ticked.has(e.id)
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'border-gray-300 hover:border-indigo-400'
+                        }`}
+                      >
+                        {ticked.has(e.id) && '✓'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium">{e.product.brand} {e.product.model}</p>
+                      <p className="font-medium">{e.product.model}</p>
                       <p className="text-gray-500 text-xs">{e.product.sizeNormalized}{e.product.isSetPricing ? ' (ชุด 4 เส้น)' : ''}</p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>

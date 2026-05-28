@@ -16,6 +16,66 @@ export class DisplayService {
   // Ephemeral per-shop search results (cleared on server restart — acceptable for live display)
   private searchCache = new Map<string, any[] | null>();
 
+  // Per-staff display state (key: shopId:staffId)
+  private staffQuotationCache = new Map<string, string | null>();
+  private staffSearchCache = new Map<string, any[] | null>();
+
+  private staffKey(shopId: string, staffId: string) {
+    return `${shopId}:${staffId}`;
+  }
+
+  async getStaffState(shopId: string, staffId: string) {
+    const key = this.staffKey(shopId, staffId);
+    const quotationId = this.staffQuotationCache.get(key) ?? null;
+    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoText: true } });
+    const promoText = shop?.promoText ?? null;
+
+    if (!quotationId) return { mode: 'slideshow', promoText };
+
+    const quotation = await this.prisma.quotation.findUnique({
+      where: { id: quotationId },
+      include: {
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, imageUrl: true } } } },
+        customer: { select: { name: true } },
+      },
+    });
+
+    if (!quotation || quotation.status === 'CONVERTED' || quotation.status === 'CANCELLED') {
+      this.staffQuotationCache.delete(key);
+      return { mode: 'slideshow', promoText };
+    }
+
+    const enrichedItems = await Promise.all(
+      quotation.items.map(async (item) => {
+        const pe = await this.prisma.priceEntry.findUnique({ where: { id: item.priceEntryId } });
+        return { ...item, priceListed: pe?.priceListed ?? 0, discTradeIn: pe?.discTradeIn ?? 0, discCard: pe?.discCard ?? 0, discCash: pe?.discCash ?? 0, discPromo: pe?.discPromo ?? 0 };
+      }),
+    );
+
+    return { mode: 'quotation', quotation: { ...quotation, items: enrichedItems }, promoText };
+  }
+
+  setStaffQuotation(shopId: string, staffId: string, quotationId: string) {
+    this.staffQuotationCache.set(this.staffKey(shopId, staffId), quotationId);
+    return { ok: true };
+  }
+
+  clearStaffQuotation(shopId: string, staffId: string) {
+    this.staffQuotationCache.delete(this.staffKey(shopId, staffId));
+    return { ok: true };
+  }
+
+  setStaffSearchResults(shopId: string, staffId: string, results: any[] | null) {
+    const key = this.staffKey(shopId, staffId);
+    if (results === null) this.staffSearchCache.delete(key);
+    else this.staffSearchCache.set(key, results);
+    return { ok: true };
+  }
+
+  getStaffSearchResults(shopId: string, staffId: string) {
+    return this.staffSearchCache.get(this.staffKey(shopId, staffId)) ?? null;
+  }
+
   async uploadImage(shopId: string, file: Express.Multer.File) {
     let url = '';
     try {

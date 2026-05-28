@@ -106,19 +106,54 @@ export class StockService {
 
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, brand: true, model: true, dotYear: true },
+      select: { id: true, brand: true, model: true, dotYear: true, sortOrder: true },
     });
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    return snapshots.map((s) => ({
+    const enriched = snapshots.map((s) => ({
       ...s,
-      entries: s.entries.map((e) => ({
-        ...e,
-        brand: productMap.get(e.productId)?.brand ?? '',
-        model: productMap.get(e.productId)?.model ?? '',
-        dotYear: productMap.get(e.productId)?.dotYear ?? null,
-      })),
+      entries: s.entries
+        .map((e) => ({
+          ...e,
+          brand: productMap.get(e.productId)?.brand ?? '',
+          model: productMap.get(e.productId)?.model ?? '',
+          dotYear: productMap.get(e.productId)?.dotYear ?? null,
+          sortOrder: productMap.get(e.productId)?.sortOrder ?? 9999,
+          prevQtySystem: null as number | null,
+          movements: [] as { qty: number; type: string; note: string | null; createdAt: Date }[],
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
     }));
+
+    // Attach movements between consecutive snapshots (desc order: [0]=newest)
+    for (let i = 0; i < enriched.length; i++) {
+      const current = enriched[i];
+      const prev = enriched[i + 1];
+      if (!prev) continue;
+
+      const movements = await this.prisma.stockMovement.findMany({
+        where: { shopId, createdAt: { gt: prev.takenAt, lte: current.takenAt } },
+        orderBy: { createdAt: 'asc' },
+        select: { productId: true, qty: true, type: true, note: true, createdAt: true },
+      });
+
+      const byProduct = new Map<string, typeof movements>();
+      for (const m of movements) {
+        const list = byProduct.get(m.productId) ?? [];
+        list.push(m);
+        byProduct.set(m.productId, list);
+      }
+
+      const prevQty = new Map(prev.entries.map((e) => [e.productId, e.qtySystem]));
+
+      current.entries = current.entries.map((e) => ({
+        ...e,
+        prevQtySystem: prevQty.get(e.productId) ?? null,
+        movements: byProduct.get(e.productId) ?? [],
+      }));
+    }
+
+    return enriched;
   }
 
   async takeSnapshot(shopId: string, takenBy: string, label?: string) {
