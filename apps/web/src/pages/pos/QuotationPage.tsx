@@ -248,7 +248,7 @@ export default function QuotationPage() {
                     {spanCell(idx + 1, { textAlign: 'center', fontWeight: 600 })}
                     {spanCell(
                       <>
-                        <p style={{ fontWeight: 700 }}>{item.product?.model}</p>
+                        <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>
                         <p style={{ color: '#374151', fontSize: '0.75rem', marginTop: 2 }}>
                           {item.product?.sizeNormalized}
                           {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
@@ -436,7 +436,7 @@ export default function QuotationPage() {
                   {rowIdx === 0 && (
                     <td rowSpan={rows.length} className={`border px-2 py-2 align-middle ${item.isSetPricing ? 'bg-pink-50' : ''}`}>
                       <p className="font-medium">
-                        {item.product?.model}
+                        {item.product?.brand} {item.product?.model}
                       </p>
                       <p className="text-gray-500">
                         {item.product?.sizeNormalized}

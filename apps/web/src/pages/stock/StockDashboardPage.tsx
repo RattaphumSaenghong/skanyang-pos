@@ -265,7 +265,7 @@ export default function StockDashboardPage() {
                     return (
                       <tr key={item.id} className={`hover:bg-gray-50 ${item.product.isSetPricing ? 'bg-pink-50' : ''}`}>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-800">{item.product.model}</p>
+                          <p className="font-medium text-gray-800">{item.product.brand} {item.product.model}</p>
                           {item.product.dotYear && (
                             <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-mono">DOT {item.product.dotYear}</span>
                           )}

@@ -179,7 +179,7 @@ export default function CustomerDisplayPage() {
               <tr key={e.id} style={{ borderBottom: '1px solid #1e293b' }}>
                 <td style={{ padding: '14px 16px' }}>
                   <p style={{ fontWeight: 700, fontSize: '1.2rem' }}>
-                    {e.product.model}
+                    {e.product.brand} {e.product.model}
                     {e.product.isSetPricing && <SetBadge />}
                   </p>
                   <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: 2 }}>{e.product.sizeNormalized}</p>

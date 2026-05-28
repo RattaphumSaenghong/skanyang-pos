@@ -173,7 +173,7 @@ export default function PosSearchPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium">{e.product.model}</p>
+                      <p className="font-medium">{e.product.brand} {e.product.model}</p>
                       <p className="text-gray-500 text-xs">{e.product.sizeNormalized}{e.product.isSetPricing ? ' (ชุด 4 เส้น)' : ''}</p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>

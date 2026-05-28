@@ -172,10 +172,10 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
   const rows: ParsedPriceRow[] = [];
   let skipped = 0;
 
-  // Auto-detect data start: find first row where col C has a parseable tire size
+  // Auto-detect data start: find first row where col D has a parseable tire size
   let dataStartRow = 3;
   for (let r = 0; r <= Math.min(15, range.e.r); r++) {
-    const sizeCell = ws[XLSX.utils.encode_cell({ r, c: 2 })];
+    const sizeCell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
     if (sizeCell?.v) {
       const norm = normalizeSize(String(sizeCell.v));
       if (parseSizeParts(norm)) {
@@ -189,11 +189,12 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
     try {
       const v = (c: number) => ws[XLSX.utils.encode_cell({ r, c })]?.v;
 
-      const modelRaw = v(0); // A: model name
-      const sizeRaw = v(2);  // C: size string
+      const brandRaw = v(0); // A: brand name
+      const modelRaw = v(1); // B: model name
+      const sizeRaw  = v(3); // D: size string
 
       // Skip completely blank rows
-      if (!modelRaw && !sizeRaw) continue;
+      if (!brandRaw && !modelRaw && !sizeRaw) continue;
       if (!sizeRaw) { skipped++; continue; }
 
       const sizeStr = String(sizeRaw).trim();
@@ -204,44 +205,43 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
       const model = modelRaw ? String(modelRaw).trim() : '';
       if (!model) { skipped++; continue; }
 
-      const brand = inferBrand(model);
+      const brand = brandRaw ? String(brandRaw).trim().toUpperCase() : inferBrand(model);
 
-      // DOT year: extracted from *NN suffix in the size string (now preserved in sizeNormalized).
-      // Col B may contain a full DOT WWYY code but we don't use it for deduplication.
+      // DOT year: extracted from *NN suffix in the size string (preserved in sizeNormalized).
       const dotYear = (() => { const m = sizeStr.match(/\*(\d+)$/); return m ? m[1] : null; })();
 
-      // Set pricing = pink fill (FF99FF)
-      const fillRgb = getFillRgb(ws, r, 0);
+      // Set pricing = pink fill (FF99FF) on col B (model column)
+      const fillRgb = getFillRgb(ws, r, 1);
       const isSetPricing = fillRgb === PINK_RGB;
 
       // Prices & costs
-      //   D(3)=ARP   E(4)=listed   F(5)=discPromo   G(6)=discTradeIn
-      //   H(7)=discCard   I(8)=discCash
-      //   J(9)=costNormal   L(11)=costPromo   AD(29)=oldCost
-      //   N(13)=cashPrice   O(14)=cardPrice (may be empty → = cash)
-      //   P(15)=zeroPctPrice (may be empty → = cash)   Q(16)=bulkPrice (may be empty → compute)
-      const arp        = num(v(3));
-      const priceListed = numZ(v(4));
-      const discPromo  = numZ(v(5));
-      const discTradeIn = numZ(v(6));
-      const discCard   = numZ(v(7));
-      const discCash   = numZ(v(8));
-      const costNormal = numZ(v(9));
+      //   E(4)=ARP   F(5)=listed   G(6)=discPromo   H(7)=discTradeIn
+      //   I(8)=discCard   J(9)=discCash
+      //   K(10)=costNormal   M(12)=costPromo   AE(30)=oldCost
+      //   O(14)=cashPrice   P(15)=cardPrice (may be empty → = cash)
+      //   Q(16)=zeroPctPrice (may be empty → = cash)   R(17)=bulkPrice (may be empty → compute)
+      const arp        = num(v(4));
+      const priceListed = numZ(v(5));
+      const discPromo  = numZ(v(6));
+      const discTradeIn = numZ(v(7));
+      const discCard   = numZ(v(8));
+      const discCash   = numZ(v(9));
+      const costNormal = numZ(v(10));
 
-      // Promo cost: L column; if L empty use AD * 1.07
-      const lVal = num(v(11));
-      const adVal = num(v(29));
+      // Promo cost: M column; if M empty use AE * 1.07
+      const lVal = num(v(12));
+      const adVal = num(v(30));
       const costPromo = (lVal && lVal > 0) ? lVal
         : (adVal && adVal > 0) ? adVal * 1.07 : null;
 
-      const priceCash = numZ(v(13));  // N — always present
+      const priceCash = numZ(v(14));  // O — always present
       if (priceCash === 0 && priceListed === 0) { skipped++; continue; }
 
-      const priceCard    = num(v(14)) ?? priceCash;  // O → default to cash
-      const priceZeroPct = num(v(15)) ?? priceCash;  // P → default to cash
+      const priceCard    = num(v(15)) ?? priceCash;  // P → default to cash
+      const priceZeroPct = num(v(16)) ?? priceCash;  // Q → default to cash
 
-      // Q bulk: use if present, else compute
-      const qVal = num(v(16));
+      // R bulk: use if present, else compute
+      const qVal = num(v(17));
       let priceBulk: number;
       if (qVal && qVal > 0) {
         priceBulk = qVal;
@@ -252,13 +252,13 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
         if (priceBulk <= effectiveCost) priceBulk = priceCash; // sanity floor
       }
 
-      // Margins — read pre-computed profit-per-set from Excel (cols V/W/X = 21/22/23)
-      // and bulk gross margin ratio from col 31.
+      // Margins — read pre-computed profit-per-set from Excel (cols W/X/Y = 22/23/24)
+      // and bulk gross margin ratio from col 32.
       // Formula: margin% = (profit_per_set / 4 / selling_price) * 100
-      const profitCashSet  = num(v(21));
-      const profitCardSet  = num(v(22));
-      const profitZeroSet  = num(v(23));
-      const marginBulkRaw  = num(v(31));
+      const profitCashSet  = num(v(22));
+      const profitCardSet  = num(v(23));
+      const profitZeroSet  = num(v(24));
+      const marginBulkRaw  = num(v(32));
 
       const pct = (profit: number | null, price: number) =>
         profit !== null && price > 0
@@ -271,8 +271,8 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
       const marginBulk    = marginBulkRaw !== null
         ? parseFloat((marginBulkRaw * 100).toFixed(2)) : null;
 
-      // AG (col 32) — image URL (plain-text URLs only; embedded pictures are handled by extractRowImages)
-      const imageUrlRaw = v(32);
+      // AH (col 33) — image URL (plain-text URLs only; embedded pictures are handled by extractRowImages)
+      const imageUrlRaw = v(33);
       const imageUrlStr = imageUrlRaw ? String(imageUrlRaw).trim() : '';
       const imageUrl = imageUrlStr.startsWith('http') ? imageUrlStr : null;
 
