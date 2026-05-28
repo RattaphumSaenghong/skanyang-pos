@@ -18,7 +18,7 @@ export class UsersService {
         displayName: dto.displayName,
         passwordHash,
         role: dto.role ?? 'STAFF',
-        shopId: dto.shopId ?? null,
+        shopId: dto.shopId || null,
       },
       select: { id: true, username: true, displayName: true, role: true, shopId: true, active: true, createdAt: true },
     });

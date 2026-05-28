@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Patch, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -45,7 +45,9 @@ export class ShopsController {
   @Delete('ip-whitelist/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.OWNER)
-  removeIp(@Param('id') id: string) {
+  async removeIp(@Param('id') id: string) {
+    const entry = await this.prisma.ipWhitelist.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException('IP whitelist entry not found');
     return this.prisma.ipWhitelist.delete({ where: { id } });
   }
 }
