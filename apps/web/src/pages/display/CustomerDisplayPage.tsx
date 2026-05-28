@@ -316,9 +316,9 @@ export default function CustomerDisplayPage() {
               <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
               <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
             </ol>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
               {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 44, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
+                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 6 }} />
               ))}
             </div>
           </div>

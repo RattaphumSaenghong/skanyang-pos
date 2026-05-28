@@ -78,9 +78,8 @@ export default function QuotationPage() {
 
   const downloadPng = async () => {
     if (!printRef.current) return;
-    printRef.current.style.display = 'block';
+    await document.fonts.ready;
     const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    printRef.current.style.display = '';
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `quotation-${String(quotation?.number ?? '').padStart(5, '0')}.png`;
@@ -201,7 +200,7 @@ export default function QuotationPage() {
 
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
-    <div ref={printRef} className="hidden print:block p-8 font-sans">
+    <div ref={printRef} className="print:block p-8 font-sans" style={{ position: 'absolute', left: '-9999px', top: 0, width: 960 }}>
       <div style={{ maxWidth: 900, margin: '0 auto', border: '1px solid #e5e7eb', borderRadius: 12, padding: '2rem 2.5rem' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
@@ -230,28 +229,44 @@ export default function QuotationPage() {
           <tbody>
             {items.map((item: any, idx: number) => {
               const rows = buildPaymentRows(item);
-              return rows.map((row, rowIdx) => (
-                <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
-                  {rowIdx === 0 && <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 600 }}>{idx + 1}</td>}
-                  {rowIdx === 0 && (
-                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', verticalAlign: 'middle' }}>
-                      <p style={{ fontWeight: 700 }}>{item.product?.model}</p>
-                      <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: 2 }}>
-                        {item.product?.sizeNormalized}
-                        {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #fbcfe8', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
-                      </p>
-                    </td>
-                  )}
-                  {rowIdx === 0 && <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>{(item.priceListed ?? 0).toLocaleString()}</td>}
-                  {rowIdx === 0 && <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>{(item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—'}</td>}
-                  <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{(row.discCard + row.discCash) > 0 ? (row.discCard + row.discCash).toLocaleString() : '—'}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{row.discPromo > 0 ? row.discPromo.toLocaleString() : '—'}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{row.unitPrice.toLocaleString()}</td>
-                  {rowIdx === 0 && <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '7px 9px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 700 }}>{item.qty}</td>}
-                  <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>{(row.unitPrice * item.qty).toLocaleString()}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', color: '#6b7280', fontSize: '0.75rem' }}>{row.note}</td>
-                </tr>
-              ));
+              return rows.map((row, rowIdx) => {
+                const spanCell = (content: React.ReactNode, extraStyle?: React.CSSProperties) => (
+                  <td style={{
+                    borderLeft: '1px solid #e5e7eb',
+                    borderRight: '1px solid #e5e7eb',
+                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    borderTop: rowIdx === 0 ? '1px solid #e5e7eb' : 'none',
+                    padding: '7px 9px',
+                    verticalAlign: 'middle',
+                    ...extraStyle,
+                  }}>
+                    {rowIdx === 0 ? content : null}
+                  </td>
+                );
+                return (
+                  <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
+                    {spanCell(idx + 1, { textAlign: 'center', fontWeight: 600 })}
+                    {spanCell(
+                      <>
+                        <p style={{ fontWeight: 700 }}>{item.product?.model}</p>
+                        <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: 2 }}>
+                          {item.product?.sizeNormalized}
+                          {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #fbcfe8', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                        </p>
+                      </>,
+                      { padding: '8px 10px' }
+                    )}
+                    {spanCell((item.priceListed ?? 0).toLocaleString(), { textAlign: 'right', fontFamily: 'monospace' })}
+                    {spanCell((item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—', { textAlign: 'right', fontFamily: 'monospace' })}
+                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{(row.discCard + row.discCash) > 0 ? (row.discCard + row.discCash).toLocaleString() : '—'}</td>
+                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{row.discPromo > 0 ? row.discPromo.toLocaleString() : '—'}</td>
+                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{row.unitPrice.toLocaleString()}</td>
+                    {spanCell(item.qty, { textAlign: 'center', fontWeight: 700 })}
+                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>{(row.unitPrice * item.qty).toLocaleString()}</td>
+                    <td style={{ border: '1px solid #e5e7eb', padding: '5px 9px', color: '#6b7280', fontSize: '0.75rem' }}>{row.note}</td>
+                  </tr>
+                );
+              });
             })}
           </tbody>
         </table>
@@ -269,9 +284,9 @@ export default function QuotationPage() {
               <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
               <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
             </ol>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
               {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 36, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
+                <img key={name} src={`/payment-icons/${name}.png`} alt={name} style={{ height: 28, width: 'auto', objectFit: 'contain', borderRadius: 4 }} />
               ))}
             </div>
           </div>
@@ -499,20 +514,22 @@ export default function QuotationPage() {
             {shop.promoText}
           </p>
         )}
-        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
-          <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
-          <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
-          <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
-        </ol>
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t justify-end">
-          {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
-            <img
-              key={name}
-              src={`/payment-icons/${name}.png`}
-              alt={name}
-              className="h-10 w-auto object-contain rounded"
-            />
-          ))}
+        <div className="flex items-start justify-between gap-4 mt-3 pt-3 border-t">
+          <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+            <li>ราคาสินค้า อาจมีการเปลี่ยนแปลงตามโปรโมชั่นต่างๆ</li>
+            <li>ราคาตีเทิร์นยางเก่า อาจเปลี่ยนแปลงตามการสึกหรอของยางในวันที่มาเปลี่ยน</li>
+            <li>ราคานี้รวมค่าบริการเปลี่ยน จุ๊ป-ถ่วงล้อ-ตั้งศูนย์-ลมไนโตรเจน สำหรับลูกค้าเปลี่ยนยาง 4 เส้นเท่านั้น</li>
+          </ol>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {['krungsri', 'aeon', 'ktc', 'kbank-smartpay'].map((name) => (
+              <img
+                key={name}
+                src={`/payment-icons/${name}.png`}
+                alt={name}
+                className="h-8 w-auto object-contain rounded"
+              />
+            ))}
+          </div>
         </div>
       </div>
 
