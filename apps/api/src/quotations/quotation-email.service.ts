@@ -99,38 +99,52 @@ export class QuotationEmailService {
       doc.moveDown();
 
       // Table
-      const cols = [180, 80, 40, 75, 75, 75];
-      const headers = ['สินค้า', 'ขนาด', 'จำนวน', 'เงินสด', 'บัตร', '0%'];
+      const cols = [160, 70, 30, 55, 55, 50, 50, 55, 55];
+      const headers = ['สินค้า', 'ขนาด', 'จนวน', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/สด', 'ลดโปรฯ', 'ราคา/เส้น', 'รวม'];
       const startX = 50;
+      const ROW_H = 22;
 
       const drawRow = (cells: string[], y: number, isHeader = false) => {
         let x = startX;
         cells.forEach((cell, i) => {
-          doc.rect(x, y, cols[i], 20).stroke();
-          if (isHeader) doc.fontSize(9).fillColor('#444444');
-          else doc.fontSize(9).fillColor('#000000');
-          doc.text(cell, x + 3, y + 5, { width: cols[i] - 6, align: i > 2 ? 'right' : 'left' });
+          doc.rect(x, y, cols[i], ROW_H).stroke();
+          if (isHeader) doc.fontSize(8).fillColor('#444444');
+          else doc.fontSize(8).fillColor('#000000');
+          const align = i === 0 || i === 1 ? 'left' : 'right';
+          doc.text(cell, x + 3, y + 6, { width: cols[i] - 6, align });
           x += cols[i];
         });
       };
 
+      const paymentLabels = ['0% 10เดือน', 'รูดบัตร', 'สด/โอน'];
+
       let rowY = doc.y;
       drawRow(headers, rowY, true);
-      rowY += 20;
+      rowY += ROW_H;
 
       for (const item of quotation.items ?? []) {
-        drawRow(
-          [
-            `${item.product.brand} ${item.product.model}`,
-            item.product.sizeNormalized,
-            String(item.qty),
-            item.unitPriceCash.toLocaleString(),
-            item.unitPriceCard.toLocaleString(),
-            item.unitPriceZeroPct.toLocaleString(),
-          ],
-          rowY,
-        );
-        rowY += 20;
+        const discounts = [
+          { price: item.unitPriceZeroPct, discCardCash: 0, discPromo: item.discPromo ?? 0, label: paymentLabels[0] },
+          { price: item.unitPriceCard, discCardCash: item.discCard ?? 0, discPromo: item.discPromo ?? 0, label: paymentLabels[1] },
+          { price: item.unitPriceCash, discCardCash: item.discCash ?? 0, discPromo: item.discPromo ?? 0, label: paymentLabels[2] },
+        ];
+        for (const d of discounts) {
+          drawRow(
+            [
+              `${item.product.brand} ${item.product.model}`,
+              item.product.sizeNormalized,
+              String(item.qty),
+              (item.priceListed ?? 0).toLocaleString(),
+              (item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—',
+              d.discCardCash > 0 ? d.discCardCash.toLocaleString() : '—',
+              d.discPromo > 0 ? d.discPromo.toLocaleString() : '—',
+              d.price.toLocaleString(),
+              (d.price * item.qty).toLocaleString(),
+            ],
+            rowY,
+          );
+          rowY += ROW_H;
+        }
       }
 
       if (quotation.notes) {

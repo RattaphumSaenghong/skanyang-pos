@@ -199,7 +199,7 @@ export default function PosSearchPage() {
                     <td className="px-4 py-3 text-center">
                       <div className="inline-flex items-center gap-1">
                         <button
-                          disabled={!qty[e.id] || qty[e.id] <= 1}
+                          disabled={!qty[e.id] || qty[e.id] <= 0}
                           onClick={() =>
                             setQty((q) => {
                               const next = (q[e.id] ?? 0) - 1;

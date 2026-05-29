@@ -37,8 +37,8 @@ type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash
 
 function buildPaymentRows(item: QuotationItem): PaymentRow[] {
   return [
-    { label: '0%', unitPrice: item.unitPriceZeroPct, discCard: 0, discCash: 0, discPromo: 0, note: '0% 10 เดือน' },
-    { label: 'บัตร', unitPrice: item.unitPriceCard, discCard: item.discCard ?? 0, discCash: 0, discPromo: 0, note: 'รูดบัตรเต็มจำนวน' },
+    { label: '0%', unitPrice: item.unitPriceZeroPct, discCard: 0, discCash: 0, discPromo: item.discPromo ?? 0, note: '0% 10 เดือน' },
+    { label: 'บัตร', unitPrice: item.unitPriceCard, discCard: item.discCard ?? 0, discCash: 0, discPromo: item.discPromo ?? 0, note: 'รูดบัตรเต็มจำนวน' },
     { label: 'สด/โอน', unitPrice: item.unitPriceCash, discCard: 0, discCash: item.discCash ?? 0, discPromo: item.discPromo ?? 0, note: 'เงินสด/เงินโอน' },
   ];
 }
@@ -233,8 +233,8 @@ export default function CustomerDisplayPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead style={{ background: '#f9fafb' }}>
             <tr>
-              {['No', 'รูป', 'ยี่ห้อ / รุ่น / ขนาด', 'ราคาปก', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'หมายเหตุ'].map((h) => (
-                <th key={h} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ / รุ่น / ขนาด' || h === 'หมายเหตุ' ? 'left' : 'right', color: '#6b7280', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
+              {['No', 'รูป', 'ยี่ห้อ / รุ่น / ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'วิธีการชำระ'].map((h) => (
+                <th key={h} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ / รุ่น / ขนาด' || h === 'วิธีการชำระ' ? 'left' : 'right', color: '#6b7280', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
                   {h}
                 </th>
               ))}

@@ -37,7 +37,7 @@ function buildPaymentRows(item: any): PaymentRow[] {
       unitPrice: item.unitPriceZeroPct,
       discCard: 0,
       discCash: 0,
-      discPromo: 0,
+      discPromo: item.discPromo ?? 0,
       note: '0% 10เดือน',
     },
     {
@@ -45,7 +45,7 @@ function buildPaymentRows(item: any): PaymentRow[] {
       unitPrice: item.unitPriceCard,
       discCard: item.discCard ?? 0,
       discCash: 0,
-      discPromo: 0,
+      discPromo: item.discPromo ?? 0,
       note: 'รูดบัตรเต็มจำนวน',
     },
     {
@@ -200,8 +200,8 @@ export default function QuotationPage() {
 
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
-    <div ref={printRef} className="absolute -left-[9999px] top-0 w-[960px] print:static print:left-auto print:top-auto print:w-full print:block p-8 font-sans">
-      <div style={{ maxWidth: 900, margin: '0 auto', border: '2px solid #6b7280', borderRadius: 12, padding: '2rem 2.5rem' }}>
+    <div ref={printRef} className="absolute -left-[9999px] top-0 w-[1200px] print:static print:left-auto print:top-auto print:w-full print:block p-8 font-sans">
+      <div style={{ maxWidth: 1150, margin: '0 auto', border: '2px solid #6b7280', borderRadius: 12, padding: '2rem 2.5rem' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #9ca3af', paddingBottom: '1rem' }}>
           <p style={{ fontSize: '0.68rem', color: '#374151', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
@@ -219,8 +219,8 @@ export default function QuotationPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
           <thead style={{ background: '#e5e7eb' }}>
             <tr>
-              {['No', 'รุ่น / ขนาด', 'ราคาปก', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'หมายเหตุ'].map((h) => (
-                <th key={h} style={{ border: '1px solid #6b7280', padding: '7px 9px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'รุ่น / ขนาด' || h === 'หมายเหตุ' ? 'left' : 'right', color: '#111', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700 }}>
+              {['No', 'ยี่ห้อ/รุ่น/ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'วิธีการชำระ'].map((h) => (
+                <th key={h} style={{ border: '1px solid #6b7280', padding: '7px 9px', whiteSpace: 'nowrap', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ/รุ่น/ขนาด' || h === 'วิธีการชำระ' ? 'left' : 'right', color: '#111', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700 }}>
                   {h}
                 </th>
               ))}
@@ -234,13 +234,14 @@ export default function QuotationPage() {
                   <td style={{
                     borderLeft: '1px solid #6b7280',
                     borderRight: '1px solid #6b7280',
-                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #6b7280' : 'none',
                     borderTop: rowIdx === 0 ? '1px solid #6b7280' : 'none',
-                    padding: '7px 9px',
+                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #6b7280' : 'none',
+                    padding: '5px 9px',
                     verticalAlign: 'middle',
+                    background: '#fee2e2',
                     ...extraStyle,
                   }}>
-                    {rowIdx === 0 ? content : null}
+                    {rowIdx === Math.floor(rows.length / 2) ? content : null}
                   </td>
                 );
                 return (
@@ -410,14 +411,14 @@ export default function QuotationPage() {
             <tr>
               <th className="border px-2 py-2 text-center">No</th>
               <th className="border px-2 py-2 text-left">ยี่ห้อ/รุ่น/ขนาด</th>
-              <th className="border px-2 py-2 text-right">ราคาปก</th>
+              <th className="border px-2 py-2 text-right">ราคาปกติ</th>
               <th className="border px-2 py-2 text-right">ลดยางเก่า</th>
               <th className="border px-2 py-2 text-right">ลดบัตร/ลดสด</th>
               <th className="border px-2 py-2 text-right">ลดโปรฯ</th>
               <th className="border px-2 py-2 text-right">ราคา/เส้น</th>
               <th className="border px-2 py-2 text-center">จำนวน</th>
               <th className="border px-2 py-2 text-right">รวม(ชุด)</th>
-              <th className="border px-2 py-2 text-left">หมายเหตุ</th>
+              <th className="border px-2 py-2 text-left">วิธีการชำระ</th>
             </tr>
           </thead>
           <tbody>
