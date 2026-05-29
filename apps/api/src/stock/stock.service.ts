@@ -253,7 +253,18 @@ export class StockService {
     return {
       date,
       summary: { tiresOut, tiresIn, totalRevenue, salesCount: sales.length },
-      byRim: [...byRim.values()].sort((a, b) => a.rim - b.rim),
+      byRim: [...byRim.values()].sort((a, b) => a.rim - b.rim).map((g) => ({
+        ...g,
+        models: g.models.sort((a: any, b: any) => {
+          const priority = (brand: string) => {
+            const b = brand.toUpperCase();
+            if (b.includes('MICHELIN')) return 0;
+            if (b.includes('BFGOODRICH') || b.includes('BF')) return 1;
+            return 2;
+          };
+          return priority(a.brand) - priority(b.brand);
+        }),
+      })),
       movements: movements.map((m) => {
         const p = productMap.get(m.productId);
         return { id: m.id, type: m.type, qty: m.qty, note: m.note, createdAt: m.createdAt, brand: p?.brand ?? '', model: p?.model ?? '', sizeNormalized: p?.sizeNormalized ?? '' };
