@@ -199,6 +199,68 @@ export class StockService {
     return snapshot;
   }
 
+  async dailyReport(shopId: string, date: string) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const movements = await this.prisma.stockMovement.findMany({
+      where: { shopId, createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const productIds = [...new Set(movements.map((m) => m.productId))];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, brand: true, model: true, sizeNormalized: true, sizeRim: true },
+    });
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Aggregate per product
+    const byProduct = new Map<string, { in: number; out: number; adjust: number }>();
+    for (const m of movements) {
+      const agg = byProduct.get(m.productId) ?? { in: 0, out: 0, adjust: 0 };
+      if (m.type === 'IN') agg.in += m.qty;
+      else if (m.type === 'OUT') agg.out += Math.abs(m.qty);
+      else agg.adjust += m.qty;
+      byProduct.set(m.productId, agg);
+    }
+
+    // Group by rim
+    const byRim = new Map<number, { rim: number; tiresOut: number; tiresIn: number; models: any[] }>();
+    for (const [productId, agg] of byProduct) {
+      const p = productMap.get(productId);
+      if (!p) continue;
+      const rim = p.sizeRim ?? 0;
+      const rimGroup = byRim.get(rim) ?? { rim, tiresOut: 0, tiresIn: 0, models: [] };
+      rimGroup.tiresOut += agg.out;
+      rimGroup.tiresIn += agg.in;
+      rimGroup.models.push({ productId, brand: p.brand, model: p.model, sizeNormalized: p.sizeNormalized, out: agg.out, in: agg.in, adjust: agg.adjust });
+      byRim.set(rim, rimGroup);
+    }
+
+    // Sales summary for the day
+    const sales = await this.prisma.sale.findMany({
+      where: { shopId, createdAt: { gte: start, lte: end } },
+      select: { totalAmount: true, paymentMethod: true },
+    });
+
+    const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
+    const tiresOut = [...byProduct.values()].reduce((s, x) => s + x.out, 0);
+    const tiresIn = [...byProduct.values()].reduce((s, x) => s + x.in, 0);
+
+    return {
+      date,
+      summary: { tiresOut, tiresIn, totalRevenue, salesCount: sales.length },
+      byRim: [...byRim.values()].sort((a, b) => a.rim - b.rim),
+      movements: movements.map((m) => {
+        const p = productMap.get(m.productId);
+        return { id: m.id, type: m.type, qty: m.qty, note: m.note, createdAt: m.createdAt, brand: p?.brand ?? '', model: p?.model ?? '', sizeNormalized: p?.sizeNormalized ?? '' };
+      }),
+    };
+  }
+
   async saveSnapshot(
     snapshotId: string,
     shopId: string,

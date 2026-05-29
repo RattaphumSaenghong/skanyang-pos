@@ -15,6 +15,7 @@ const navItems = [
 const ownerItems = [
   { to: '/reports/margins', label: 'รายงาน', icon: '📊' },
   { to: '/reports/sales', label: 'ยอดขาย', icon: '💰' },
+  { to: '/reports/stock', label: 'สต็อกรายวัน', icon: '📋' },
   { to: '/settings/users', label: 'ตั้งค่า', icon: '⚙️' },
 ];
 

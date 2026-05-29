@@ -20,6 +20,13 @@ export class StockController {
     return this.service.movements(user.shopId);
   }
 
+  @Get('daily-report')
+  dailyReport(@CurrentUser() user: any, @Query('date') date: string, @Query('shopId') qShopId?: string) {
+    const shopId = user.role === 'OWNER' && qShopId ? qShopId : user.shopId;
+    const d = date ?? new Date().toISOString().slice(0, 10);
+    return this.service.dailyReport(shopId, d);
+  }
+
   @Post('adjust')
   adjust(@Body() body: any, @CurrentUser() user: any) {
     // OWNER may adjust any shop; STAFF is locked to their own shop
