@@ -110,7 +110,7 @@ export default function StockReportPage() {
     enabled: !!shopId,
   });
 
-  const summary = data?.summary ?? { tiresOut: 0, tiresIn: 0, totalRevenue: 0, salesCount: 0 };
+  const summary = data?.summary ?? { tiresOut: 0, tiresIn: 0, adjustCount: 0, totalRevenue: 0, salesCount: 0 };
   const byType = data?.byType ?? { in: [], out: [], adjust: [] };
   const movements: any[] = data?.movements ?? [];
 
@@ -150,8 +150,8 @@ export default function StockReportPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'ยางรับเข้า', value: summary.tiresIn,  unit: 'เส้น', icon: '📥', cls: 'text-green-600' },
-          { label: 'ยางขายออก', value: summary.tiresOut, unit: 'เส้น', icon: '📤', cls: 'text-red-600' },
+          { label: 'ยางรับเข้า',     value: summary.tiresIn,    unit: 'เส้น',    icon: '📥', cls: 'text-green-600' },
+          { label: 'ปรับแต่งสต็อก', value: summary.adjustCount, unit: 'รายการ', icon: '✏️', cls: 'text-yellow-600' },
           { label: 'ยอดขาย',    value: summary.totalRevenue.toLocaleString(), unit: '฿', icon: '💰', cls: 'text-blue-600' },
           { label: 'จำนวนบิล',  value: summary.salesCount, unit: 'บิล', icon: '🧾', cls: 'text-gray-700' },
         ].map((c) => (

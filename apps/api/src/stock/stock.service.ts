@@ -257,10 +257,11 @@ export class StockService {
     const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
     const tiresOut = [...byProduct.values()].reduce((s, x) => s + x.out, 0);
     const tiresIn = [...byProduct.values()].reduce((s, x) => s + x.in, 0);
+    const adjustCount = adjustList.length;
 
     return {
       date,
-      summary: { tiresOut, tiresIn, totalRevenue, salesCount: sales.length },
+      summary: { tiresOut, tiresIn, adjustCount, totalRevenue, salesCount: sales.length },
       byType: {
         in: sortProducts(inList),
         out: sortProducts(outList),
