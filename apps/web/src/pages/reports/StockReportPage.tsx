@@ -54,8 +54,8 @@ export default function StockReportPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'ยางขายออก', value: summary.tiresOut, unit: 'เส้น', icon: '📤', cls: 'text-red-600' },
           { label: 'ยางรับเข้า', value: summary.tiresIn,  unit: 'เส้น', icon: '📥', cls: 'text-green-600' },
+          { label: 'ยางขายออก', value: summary.tiresOut, unit: 'เส้น', icon: '📤', cls: 'text-red-600' },
           { label: 'ยอดขาย',    value: summary.totalRevenue.toLocaleString(), unit: '฿', icon: '💰', cls: 'text-blue-600' },
           { label: 'จำนวนบิล',  value: summary.salesCount, unit: 'บิล', icon: '🧾', cls: 'text-gray-700' },
         ].map((c) => (
@@ -78,8 +78,8 @@ export default function StockReportPage() {
           {/* In / Out sections */}
           <div className="grid grid-cols-2 gap-6 mb-8">
             {[
-              { key: 'out', label: '📤 ยางขายออก', items: byType.out, cls: 'text-red-500', sign: '-', headerCls: 'bg-red-50 border-red-100' },
               { key: 'in',  label: '📥 ยางรับเข้า', items: byType.in,  cls: 'text-green-600', sign: '+', headerCls: 'bg-green-50 border-green-100' },
+              { key: 'out', label: '📤 ยางขายออก', items: byType.out, cls: 'text-red-500', sign: '-', headerCls: 'bg-red-50 border-red-100' },
             ].map((section) => (
               <div key={section.key} className="bg-white rounded-xl border overflow-hidden">
                 <div className={`px-4 py-3 border-b flex items-center justify-between ${section.headerCls}`}>
