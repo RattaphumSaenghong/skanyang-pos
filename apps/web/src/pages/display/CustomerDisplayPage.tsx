@@ -58,6 +58,19 @@ function SetBadge() {
   );
 }
 
+// Blue badge for DOT year
+function DotBadge({ year }: { year: string }) {
+  return (
+    <span style={{
+      display: 'inline-block', background: '#eff6ff', color: '#1d4ed8',
+      border: '1px solid #bfdbfe', borderRadius: 6, fontSize: '0.72rem',
+      fontWeight: 700, padding: '1px 7px', marginLeft: 6, verticalAlign: 'middle',
+    }}>
+      DOT {year}
+    </span>
+  );
+}
+
 export default function CustomerDisplayPage() {
   const { shopId, staffId } = useParams<{ shopId: string; staffId?: string }>();
   const [images, setImages] = useState<DisplayImage[]>([]);
@@ -181,6 +194,7 @@ export default function CustomerDisplayPage() {
                   <p style={{ fontWeight: 700, fontSize: '1.2rem' }}>
                     {e.product.brand} {e.product.model}
                     {e.product.isSetPricing && <SetBadge />}
+                    {e.product.dotYear && <DotBadge year={e.product.dotYear} />}
                   </p>
                   <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: 2 }}>{e.product.sizeNormalized}</p>
                 </td>
@@ -266,6 +280,7 @@ export default function CustomerDisplayPage() {
                       <p style={{ color: '#6b7280', fontSize: '0.82rem', marginTop: 2 }}>
                         {item.product.sizeNormalized}
                         {isSet && <SetBadge />}
+                        {item.product.dotYear && <DotBadge year={item.product.dotYear} />}
                       </p>
                     </td>
                   )}
