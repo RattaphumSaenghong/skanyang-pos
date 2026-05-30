@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../common/prisma/prisma.service';
 
@@ -77,25 +77,18 @@ export class DisplayService {
   }
 
   async uploadImage(shopId: string, file: Express.Multer.File) {
-    let url = '';
-    try {
-      const supabase = getSupabase();
-      if (supabase) {
-        const path = `${shopId}/${Date.now()}-${file.originalname}`;
-        const { error } = await supabase.storage
-          .from('display-images')
-          .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-        if (!error) {
-          const { data } = supabase.storage.from('display-images').getPublicUrl(path);
-          url = data.publicUrl;
-        }
-      }
-    } catch {
-      // Storage upload failure is non-fatal
-    }
+    const supabase = getSupabase();
+    if (!supabase) throw new BadRequestException('Storage not configured');
 
+    const path = `${shopId}/${Date.now()}-${file.originalname}`;
+    const { error } = await supabase.storage
+      .from('display-images')
+      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (error) throw new BadRequestException(`Upload failed: ${error.message}`);
+
+    const { data } = supabase.storage.from('display-images').getPublicUrl(path);
     return this.prisma.displayImage.create({
-      data: { shopId, url },
+      data: { shopId, url: data.publicUrl },
     });
   }
 
