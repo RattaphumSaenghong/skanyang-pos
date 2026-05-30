@@ -5,6 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.OWNER)
@@ -28,7 +29,7 @@ export class UsersController {
   }
 
   @Patch(':id/password')
-  changePassword(@Param('id') id: string, @Body() body: { password: string }) {
+  changePassword(@Param('id') id: string, @Body() body: ChangePasswordDto) {
     return this.users.changePassword(id, body.password);
   }
 
