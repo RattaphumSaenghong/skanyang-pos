@@ -257,20 +257,21 @@ export default function QuotationPage() {
                 return (
                   <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fce7f3' : row.label === 'บัตร' ? '#dbeafe' : '#dcfce7' }}>
                     {spanCell(idx + 1, { textAlign: 'center', fontWeight: 600 })}
-                    {spanCell(
-                      <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>,
-                      { padding: '8px 10px' },
-                      mid
-                    )}
-                    {spanCell(
-                      <p style={{ color: '#374151', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        {item.product?.sizeNormalized}
-                        {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
-                        {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
-                      </p>,
-                      { padding: '8px 10px' },
-                      last
-                    )}
+                    <td style={{
+                      borderLeft: '1px solid #6b7280', borderRight: '1px solid #6b7280',
+                      borderTop: rowIdx === 0 ? '1px solid #6b7280' : 'none',
+                      borderBottom: rowIdx === last ? '1px solid #6b7280' : 'none',
+                      padding: '5px 10px', background: '#fee2e2',
+                    }}>
+                      {rowIdx === mid && <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>}
+                      {rowIdx === last && (
+                        <p style={{ color: '#374151', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                          {item.product?.sizeNormalized}
+                          {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                          {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
+                        </p>
+                      )}
+                    </td>
                     {spanCell((item.priceListed ?? 0).toLocaleString(), { textAlign: 'right', fontFamily: 'monospace' })}
                     {spanCell((item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—', { textAlign: 'right', fontFamily: 'monospace' })}
                     <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{(row.discCard + row.discCash) > 0 ? (row.discCard + row.discCash).toLocaleString() : '—'}</td>
