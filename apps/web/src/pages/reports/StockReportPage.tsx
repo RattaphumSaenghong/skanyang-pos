@@ -75,6 +75,38 @@ export default function StockReportPage() {
         </div>
       ) : (
         <>
+          {/* Adjust section — only shown if there are adjustments */}
+          {byType.adjust.length > 0 && (
+            <div className="bg-white rounded-xl border overflow-hidden mb-8">
+              <div className="px-4 py-3 border-b bg-yellow-50 border-yellow-100">
+                <span className="font-bold text-gray-800">✏️ ปรับแต่งสต็อก</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
+                    <th className="px-4 py-2 text-center">ขอบ</th>
+                    <th className="px-4 py-2 text-center">จำนวน</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {byType.adjust.map((m: any) => (
+                    <tr key={m.productId} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
+                        <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
+                      <td className={`px-4 py-2.5 text-center font-mono font-bold ${m.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {m.qty > 0 ? '+' : ''}{m.qty}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* In / Out sections */}
           <div className="grid grid-cols-2 gap-6 mb-8">
             {[
@@ -116,38 +148,6 @@ export default function StockReportPage() {
               </div>
             ))}
           </div>
-
-          {/* Adjust section — only shown if there are adjustments */}
-          {byType.adjust.length > 0 && (
-            <div className="bg-white rounded-xl border overflow-hidden mb-8">
-              <div className="px-4 py-3 border-b bg-yellow-50 border-yellow-100">
-                <span className="font-bold text-gray-800">✏️ ปรับแต่งสต็อก</span>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
-                    <th className="px-4 py-2 text-center">ขอบ</th>
-                    <th className="px-4 py-2 text-center">จำนวน</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {byType.adjust.map((m: any) => (
-                    <tr key={m.productId} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5">
-                        <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
-                        <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
-                      </td>
-                      <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
-                      <td className={`px-4 py-2.5 text-center font-mono font-bold ${m.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {m.qty > 0 ? '+' : ''}{m.qty}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           {/* Movements log */}
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">บันทึกการเคลื่อนไหวทั้งหมด</h3>
