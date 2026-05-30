@@ -258,11 +258,13 @@ export default function QuotationPage() {
                     {spanCell(
                       <>
                         <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>
-                        <p style={{ color: '#374151', fontSize: '0.75rem', marginTop: 2 }}>
-                          {item.product?.sizeNormalized}
-                          {item.isSetPricing && <span style={{ marginLeft: 6, background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
-                          {item.product?.dotYear && <span style={{ marginLeft: 6, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
-                        </p>
+                        <p style={{ color: '#374151', fontSize: '0.75rem', marginTop: 2 }}>{item.product?.sizeNormalized}</p>
+                        {(item.isSetPricing || item.product?.dotYear) && (
+                          <p style={{ marginTop: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                            {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
+                          </p>
+                        )}
                       </>,
                       { padding: '8px 10px' }
                     )}
@@ -448,19 +450,21 @@ export default function QuotationPage() {
                       <p className="font-medium">
                         {item.product?.brand} {item.product?.model}
                       </p>
-                      <p className="text-gray-500">
-                        {item.product?.sizeNormalized}
-                        {item.isSetPricing && (
-                          <span className="ml-1.5 inline-block bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold px-1.5 py-0.5 rounded">
-                            ชุด 4 เส้น
-                          </span>
-                        )}
-                        {item.product?.dotYear && (
-                          <span className="ml-1.5 inline-block bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-1.5 py-0.5 rounded">
-                            DOT {item.product.dotYear}
-                          </span>
-                        )}
-                      </p>
+                      <p className="text-gray-500">{item.product?.sizeNormalized}</p>
+                      {(item.isSetPricing || item.product?.dotYear) && (
+                        <div className="flex gap-1 flex-wrap mt-0.5">
+                          {item.isSetPricing && (
+                            <span className="inline-block bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold px-1.5 py-0.5 rounded">
+                              ชุด 4 เส้น
+                            </span>
+                          )}
+                          {item.product?.dotYear && (
+                            <span className="inline-block bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-1.5 py-0.5 rounded">
+                              DOT {item.product.dotYear}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                   )}
                   {rowIdx === 0 && (
