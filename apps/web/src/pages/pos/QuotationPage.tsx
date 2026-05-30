@@ -82,7 +82,7 @@ export default function QuotationPage() {
     const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
-    a.download = `quotation-${String(quotation?.number ?? '').padStart(5, '0')}.png`;
+    a.download = `quotation-${qNum}.png`;
     a.click();
   };
 
@@ -196,7 +196,10 @@ export default function QuotationPage() {
 
   const items = quotation.items ?? [];
 
-  const qNum = String(quotation.number).padStart(5, '0');
+  const shopPrefix = shop?.name
+    ? shop.name.replace(/[^a-zA-Zก-๙]/g, '').slice(0, 2).toUpperCase()
+    : '';
+  const qNum = `${shopPrefix}${String(quotation.number).padStart(5, '0')}`;
 
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
@@ -205,9 +208,9 @@ export default function QuotationPage() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #9ca3af', paddingBottom: '1rem' }}>
           <p style={{ fontSize: '0.68rem', color: '#374151', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
-          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
-          <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
-          <p style={{ fontSize: '0.82rem', color: '#111' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+          <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>{shop?.name ?? '—'}</p>
+          {shop?.address && <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: 2 }}>{shop.address}</p>}
+          {shop?.phone && <p style={{ fontSize: '0.82rem', color: '#111' }}>โทร. {shop.phone}</p>}
           <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid #9ca3af', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '0.85rem' }}>
             <span style={{ color: '#374151' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
             {plateNumber && <span style={{ color: '#374151' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
@@ -305,7 +308,7 @@ export default function QuotationPage() {
     <div className="print:hidden p-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold">ใบเสนอราคา #{String(quotation.number).padStart(5, '0')}</h2>
+        <h2 className="text-xl font-bold">ใบเสนอราคา #{qNum}</h2>
         <div className="flex items-center gap-3">
           {displayToast && (
             <span className="text-sm text-green-700 bg-green-100 px-3 py-1 rounded-full font-medium">
@@ -384,9 +387,9 @@ export default function QuotationPage() {
       {/* Shop header */}
       <div className="bg-white rounded-xl border px-6 py-4 mb-4 text-center">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-0.5">ใบเสนอราคา</p>
-        <p className="text-xl font-extrabold text-gray-900 leading-tight">ไทร์พลัส ส.การยางพิษณุโลก</p>
-        <p className="text-sm text-gray-500 mt-0.5">(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
-        <p className="text-sm text-gray-600 mt-1">โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+        <p className="text-xl font-extrabold text-gray-900 leading-tight">{shop?.name ?? '—'}</p>
+        {shop?.address && <p className="text-sm text-gray-500 mt-0.5">{shop.address}</p>}
+        {shop?.phone && <p className="text-sm text-gray-600 mt-1">โทร. {shop.phone}</p>}
         <div className="mt-3 pt-3 border-t flex justify-center gap-10 text-sm">
           <span className="text-gray-500">
             วันที่:{' '}

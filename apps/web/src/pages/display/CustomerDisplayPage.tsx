@@ -77,6 +77,7 @@ export default function CustomerDisplayPage() {
   const [quotation, setQuotation] = useState<ActiveQuotation | null>(null);
   const [promoText, setPromoText] = useState<string | null>(null);
   const [searchEntries, setSearchEntries] = useState<SearchEntry[] | null>(null);
+  const [shopInfo, setShopInfo] = useState<{ name: string; phone?: string; address?: string } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const posRef = useRef(0);
@@ -98,6 +99,14 @@ export default function CustomerDisplayPage() {
     go();
     const t = setInterval(go, 8000);
     return () => clearInterval(t);
+  }, [shopId]);
+
+  // Fetch shop info once on mount
+  useEffect(() => {
+    fetch(`/api/shops/${shopId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setShopInfo({ name: d.name, phone: d.phone, address: d.address }); })
+      .catch(() => {});
   }, [shopId]);
 
   // Poll display state every 3s — switches between slideshow and quotation view
@@ -156,7 +165,7 @@ export default function CustomerDisplayPage() {
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
       {images.length === 0 ? (
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <span style={{ color: '#fff', fontSize: '4rem', fontWeight: 800, letterSpacing: 2 }}>ส.การยาง</span>
+          <span style={{ color: '#fff', fontSize: '4rem', fontWeight: 800, letterSpacing: 2 }}>{shopInfo?.name ?? '—'}</span>
         </div>
       ) : (
         <div ref={trackRef} style={{ display: 'flex', willChange: 'transform' }}>
@@ -232,9 +241,9 @@ export default function CustomerDisplayPage() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
           <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
-          <p style={{ fontSize: '1.9rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>ไทร์พลัส ส.การยางพิษณุโลก</p>
-          <p style={{ fontSize: '1rem', color: '#6b7280', marginBottom: 2 }}>(สาขาในเมือง ตรงข้ามโฮมโปร)</p>
-          <p style={{ fontSize: '0.95rem', color: '#374151' }}>โทร. 0-5522-1161 &nbsp;·&nbsp; 097-918-5556 &nbsp;·&nbsp; 082-171-7787</p>
+          <p style={{ fontSize: '1.9rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>{shopInfo?.name ?? '—'}</p>
+          {shopInfo?.address && <p style={{ fontSize: '1rem', color: '#6b7280', marginBottom: 2 }}>{shopInfo.address}</p>}
+          {shopInfo?.phone && <p style={{ fontSize: '0.95rem', color: '#374151' }}>โทร. {shopInfo.phone}</p>}
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '1rem' }}>
             <span style={{ color: '#6b7280' }}>
               วันที่: <strong style={{ color: '#111' }}>{new Date().toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>

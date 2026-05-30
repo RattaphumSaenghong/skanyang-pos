@@ -52,7 +52,7 @@ export default function Layout() {
     <div className="flex h-screen bg-gray-100">
       <aside className="w-56 bg-white border-r flex flex-col">
         <div className="p-4 border-b">
-          <p className="font-bold text-lg">ส.การยาง</p>
+          <p className="font-bold text-lg">{selectedShop?.name ?? 'POS'}</p>
           <p className="text-xs text-gray-500">{user?.username} · {user?.role === 'OWNER' ? 'Super Admin' : user?.role === 'SHOP_OWNER' ? 'เจ้าของร้าน' : 'พนักงาน'}</p>
           {isSuperOwner() && shops.length > 0 && (
             <select
