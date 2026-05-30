@@ -263,10 +263,10 @@ export default function QuotationPage() {
                       borderBottom: rowIdx === last ? '1px solid #6b7280' : 'none',
                       padding: '5px 10px', background: '#fee2e2',
                     }}>
-                      {rowIdx === mid && <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>}
-                      {rowIdx === last && (
-                        <p style={{ color: '#374151', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          {item.product?.sizeNormalized}
+                      {rowIdx === 0 && <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>}
+                      {rowIdx === 1 && <p style={{ color: '#374151', fontSize: '0.75rem' }}>{item.product?.sizeNormalized}</p>}
+                      {rowIdx === last && (item.isSetPricing || item.product?.dotYear) && (
+                        <p style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                           {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
                           {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
                         </p>
