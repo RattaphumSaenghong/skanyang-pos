@@ -238,35 +238,38 @@ export default function QuotationPage() {
             {items.map((item: any, idx: number) => {
               const rows = buildPaymentRows(item);
               return rows.map((row, rowIdx) => {
-                const spanCell = (content: React.ReactNode, extraStyle?: React.CSSProperties) => (
+                const mid = Math.floor(rows.length / 2);
+              const last = rows.length - 1;
+              const spanCell = (content: React.ReactNode, extraStyle?: React.CSSProperties, targetRow = mid) => (
                   <td style={{
                     borderLeft: '1px solid #6b7280',
                     borderRight: '1px solid #6b7280',
                     borderTop: rowIdx === 0 ? '1px solid #6b7280' : 'none',
-                    borderBottom: rowIdx === rows.length - 1 ? '1px solid #6b7280' : 'none',
+                    borderBottom: rowIdx === last ? '1px solid #6b7280' : 'none',
                     padding: '5px 9px',
                     verticalAlign: 'middle',
                     background: '#fee2e2',
                     ...extraStyle,
                   }}>
-                    {rowIdx === Math.floor(rows.length / 2) ? content : null}
+                    {rowIdx === targetRow ? content : null}
                   </td>
                 );
                 return (
                   <tr key={`print-${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fce7f3' : row.label === 'บัตร' ? '#dbeafe' : '#dcfce7' }}>
                     {spanCell(idx + 1, { textAlign: 'center', fontWeight: 600 })}
                     {spanCell(
-                      <>
-                        <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>
-                        <p style={{ color: '#374151', fontSize: '0.75rem', marginTop: 2 }}>{item.product?.sizeNormalized}</p>
-                        {(item.isSetPricing || item.product?.dotYear) && (
-                          <p style={{ marginTop: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
-                            {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
-                          </p>
-                        )}
-                      </>,
-                      { padding: '8px 10px' }
+                      <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>,
+                      { padding: '8px 10px' },
+                      mid
+                    )}
+                    {spanCell(
+                      <p style={{ color: '#374151', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        {item.product?.sizeNormalized}
+                        {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                        {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
+                      </p>,
+                      { padding: '8px 10px' },
+                      last
                     )}
                     {spanCell((item.priceListed ?? 0).toLocaleString(), { textAlign: 'right', fontFamily: 'monospace' })}
                     {spanCell((item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—', { textAlign: 'right', fontFamily: 'monospace' })}
