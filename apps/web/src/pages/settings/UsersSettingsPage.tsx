@@ -173,6 +173,7 @@ export default function UsersSettingsPage() {
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-4 py-3 text-left">ชื่อ</th>
+                  <th className="px-4 py-3 text-left">สาขา</th>
                   <th className="px-4 py-3 text-center">บทบาท</th>
                   <th className="px-4 py-3 text-center">สถานะ</th>
                   <th className="px-4 py-3"></th>
@@ -185,8 +186,11 @@ export default function UsersSettingsPage() {
                       <p className="font-medium">{u.displayName}</p>
                       <p className="text-xs text-gray-500">@{u.username}</p>
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {u.shopId ? (shops.find((s: any) => s.id === u.shopId)?.name ?? u.shopId) : <span className="text-gray-400">ทุกสาขา</span>}
+                    </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-1 rounded-full ${u.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${u.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : u.role === 'SHOP_OWNER' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
                         {u.role}
                       </span>
                     </td>
