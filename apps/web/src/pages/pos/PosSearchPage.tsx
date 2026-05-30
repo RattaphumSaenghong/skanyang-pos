@@ -144,6 +144,7 @@ export default function PosSearchPage() {
                 <th className="px-4 py-3 text-right">เงินสด</th>
                 <th className="px-4 py-3 text-right">บัตร</th>
                 <th className="px-4 py-3 text-right">0%</th>
+                <th className="px-4 py-3 text-right">ขายส่ง</th>
                 <th className="px-4 py-3 text-right">ราคาหน้าร้าน</th>
                 {isOwner && <th className="px-4 py-3 text-right">กำไร%</th>}
                 <th className="px-4 py-3 text-right">สต็อก</th>
@@ -179,6 +180,7 @@ export default function PosSearchPage() {
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCard.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceZeroPct.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-mono text-purple-600">{e.priceBulk > 0 ? e.priceBulk.toLocaleString() : '—'}</td>
                     <td className="px-4 py-3 text-right font-mono text-gray-400">{e.priceListed.toLocaleString()}</td>
                     {isOwner && (
                       <td className={`px-4 py-3 text-right font-mono text-xs ${warning ? 'text-red-500' : 'text-green-600'}`}>
