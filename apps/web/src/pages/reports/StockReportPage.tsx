@@ -1,7 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
+
+async function downloadAsPdf(ref: React.RefObject<HTMLDivElement>, filename: string) {
+  if (!ref.current) return;
+  await document.fonts.ready;
+  const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: '#f3f4f6' });
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+  pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+  pdf.save(filename);
+}
 
 function toDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -19,6 +31,8 @@ export default function StockReportPage() {
   const shopId = effectiveShopId();
   const today = toDateStr(new Date());
   const [date, setDate] = useState(today);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const logsRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['stock-daily-report', shopId, date],
@@ -42,13 +56,29 @@ export default function StockReportPage() {
           <h2 className="text-xl font-bold">รายงานสต็อกประจำวัน</h2>
           <p className="text-sm text-gray-500 mt-0.5">ยางเข้า-ออกแต่ละรุ่นในวันที่เลือก</p>
         </div>
-        <input
-          type="date"
-          value={date}
-          max={today}
-          onChange={(e) => setDate(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm bg-white"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => downloadAsPdf(reportRef, `stock-report-${date}.pdf`)}
+            disabled={isLoading}
+            className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
+          >
+            ⬇️ ดาวน์โหลดรายงาน
+          </button>
+          <button
+            onClick={() => downloadAsPdf(logsRef, `stock-logs-${date}.pdf`)}
+            disabled={isLoading}
+            className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
+          >
+            ⬇️ ดาวน์โหลด Audit Log
+          </button>
+          <input
+            type="date"
+            value={date}
+            max={today}
+            onChange={(e) => setDate(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm bg-white"
+          />
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -75,6 +105,7 @@ export default function StockReportPage() {
         </div>
       ) : (
         <>
+          <div ref={reportRef} className="bg-gray-50 rounded-xl p-4 mb-2">
           {/* Top row: ปรับแต่งสต็อก + ยางรับเข้า side by side */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             {/* ปรับแต่งสต็อก */}
@@ -178,7 +209,9 @@ export default function StockReportPage() {
             )}
           </div>
 
-          {/* Movements log */}
+          </div>
+
+          <div ref={logsRef} className="bg-gray-50 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">บันทึกการเคลื่อนไหวทั้งหมด</h3>
           <div className="bg-white rounded-xl border overflow-hidden">
             <table className="w-full text-sm">
@@ -217,6 +250,7 @@ export default function StockReportPage() {
                 })}
               </tbody>
             </table>
+          </div>
           </div>
         </>
       )}
