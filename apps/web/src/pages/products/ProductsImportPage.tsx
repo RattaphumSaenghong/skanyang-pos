@@ -77,8 +77,8 @@ export default function ProductsImportPage() {
   const { data: shops = [] } = useQuery<Shop[]>({
     queryKey: ['shops'],
     queryFn: () => api.get('/shops').then((r) => r.data),
-    enabled: isOwner,
-    onSuccess: (data) => { if (isOwner && !bannerShopId && data[0]) setBannerShopId(data[0].id); },
+    enabled: isSuperOwner,
+    onSuccess: (data) => { if (isSuperOwner && !bannerShopId && data[0]) setBannerShopId(data[0].id); },
   } as any);
 
   const effectiveBannerShopId = isOwner ? bannerShopId : (user?.shopId ?? '');
