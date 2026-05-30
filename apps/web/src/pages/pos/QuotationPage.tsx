@@ -5,6 +5,11 @@ import html2canvas from 'html2canvas';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
 
+function formatPhone(phone?: string | null): string {
+  if (!phone) return '';
+  return phone.split('\n').map((p) => p.trim()).filter(Boolean).join(' · ');
+}
+
 type PaymentRow = {
   label: string;
   unitPrice: number;
@@ -210,7 +215,7 @@ export default function QuotationPage() {
           <p style={{ fontSize: '0.68rem', color: '#374151', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา #{qNum}</p>
           <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>{shop?.name ?? '—'}</p>
           {shop?.address && <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: 2 }}>{shop.address}</p>}
-          {shop?.phone && <p style={{ fontSize: '0.82rem', color: '#111' }}>โทร. {shop.phone}</p>}
+          {shop?.phone && <p style={{ fontSize: '0.82rem', color: '#111' }}>โทร. {formatPhone(shop.phone)}</p>}
           <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid #9ca3af', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '0.85rem' }}>
             <span style={{ color: '#374151' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
             {plateNumber && <span style={{ color: '#374151' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
@@ -389,7 +394,7 @@ export default function QuotationPage() {
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-0.5">ใบเสนอราคา</p>
         <p className="text-xl font-extrabold text-gray-900 leading-tight">{shop?.name ?? '—'}</p>
         {shop?.address && <p className="text-sm text-gray-500 mt-0.5">{shop.address}</p>}
-        {shop?.phone && <p className="text-sm text-gray-600 mt-1">โทร. {shop.phone}</p>}
+        {shop?.phone && <p className="text-sm text-gray-600 mt-1">โทร. {formatPhone(shop.phone)}</p>}
         <div className="mt-3 pt-3 border-t flex justify-center gap-10 text-sm">
           <span className="text-gray-500">
             วันที่:{' '}

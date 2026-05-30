@@ -243,7 +243,7 @@ export default function CustomerDisplayPage() {
           <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
           <p style={{ fontSize: '1.9rem', fontWeight: 900, color: '#111', margin: '2px 0' }}>{shopInfo?.name ?? '—'}</p>
           {shopInfo?.address && <p style={{ fontSize: '1rem', color: '#6b7280', marginBottom: 2 }}>{shopInfo.address}</p>}
-          {shopInfo?.phone && <p style={{ fontSize: '0.95rem', color: '#374151' }}>โทร. {shopInfo.phone}</p>}
+          {shopInfo?.phone && <p style={{ fontSize: '0.95rem', color: '#374151' }}>โทร. {shopInfo.phone.split('\n').map((p: string) => p.trim()).filter(Boolean).join(' · ')}</p>}
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'center', gap: '2.5rem', fontSize: '1rem' }}>
             <span style={{ color: '#6b7280' }}>
               วันที่: <strong style={{ color: '#111' }}>{new Date().toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>

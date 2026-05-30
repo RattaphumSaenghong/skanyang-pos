@@ -337,14 +337,24 @@ export default function UsersSettingsPage() {
                   {(['name', 'phone', 'address', 'email'] as const).map((field) => (
                     <div key={field}>
                       <label className="block text-sm font-medium mb-1">
-                        {field === 'name' ? 'ชื่อร้าน' : field === 'phone' ? 'เบอร์โทรศัพท์' : field === 'address' ? 'ที่อยู่' : 'อีเมลร้าน'}
+                        {field === 'name' ? 'ชื่อร้าน' : field === 'phone' ? 'เบอร์โทรศัพท์ (หลายเบอร์ได้ — กด Enter คั่น)' : field === 'address' ? 'ที่อยู่' : 'อีเมลร้าน'}
                       </label>
-                      <input
-                        type={field === 'email' ? 'email' : 'text'}
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                        value={shopForm[field]}
-                        onChange={(e) => setShopForm((f) => f ? { ...f, [field]: e.target.value } : f)}
-                      />
+                      {field === 'phone' ? (
+                        <textarea
+                          rows={3}
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                          value={shopForm[field]}
+                          onChange={(e) => setShopForm((f) => f ? { ...f, [field]: e.target.value } : f)}
+                          placeholder={'0-5522-1161\n097-918-5556\n082-171-7787'}
+                        />
+                      ) : (
+                        <input
+                          type={field === 'email' ? 'email' : 'text'}
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                          value={shopForm[field]}
+                          onChange={(e) => setShopForm((f) => f ? { ...f, [field]: e.target.value } : f)}
+                        />
+                      )}
                     </div>
                   ))}
                   <div className="flex gap-2">
