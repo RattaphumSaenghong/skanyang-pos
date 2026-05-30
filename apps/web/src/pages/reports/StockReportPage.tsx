@@ -75,12 +75,85 @@ export default function StockReportPage() {
         </div>
       ) : (
         <>
-          {/* Adjust section — only shown if there are adjustments */}
-          {byType.adjust.length > 0 && (
-            <div className="bg-white rounded-xl border overflow-hidden mb-8">
-              <div className="px-4 py-3 border-b bg-yellow-50 border-yellow-100">
+          {/* Top row: ปรับแต่งสต็อก + ยางรับเข้า side by side */}
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            {/* ปรับแต่งสต็อก */}
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-yellow-50 flex items-center justify-between">
                 <span className="font-bold text-gray-800">✏️ ปรับแต่งสต็อก</span>
+                <span className="font-bold text-lg text-yellow-600">{byType.adjust.length > 0 ? `${byType.adjust.length} รายการ` : '—'}</span>
               </div>
+              {byType.adjust.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-center text-gray-400">ไม่มีรายการ</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
+                      <th className="px-4 py-2 text-center">ขอบ</th>
+                      <th className="px-4 py-2 text-center">จำนวน</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {byType.adjust.map((m: any) => (
+                      <tr key={m.productId} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
+                          <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
+                        <td className={`px-4 py-2.5 text-center font-mono font-bold ${m.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {m.qty > 0 ? '+' : ''}{m.qty}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            {/* ยางรับเข้า */}
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-green-50 flex items-center justify-between">
+                <span className="font-bold text-gray-800">📥 ยางรับเข้า</span>
+                <span className="font-bold text-lg text-green-600">{byType.in.length > 0 ? `${byType.in.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
+              </div>
+              {byType.in.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-center text-gray-400">ไม่มีรายการ</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
+                      <th className="px-4 py-2 text-center">ขอบ</th>
+                      <th className="px-4 py-2 text-center">จำนวน</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {byType.in.map((m: any) => (
+                      <tr key={m.productId} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
+                          <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
+                        <td className="px-4 py-2.5 text-center font-mono font-bold text-green-600">+{m.qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* ยางขายออก — full width below */}
+          <div className="bg-white rounded-xl border overflow-hidden mb-8">
+            <div className="px-4 py-3 border-b bg-red-50 flex items-center justify-between">
+              <span className="font-bold text-gray-800">📤 ยางขายออก</span>
+              <span className="font-bold text-lg text-red-500">{byType.out.length > 0 ? `${byType.out.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
+            </div>
+            {byType.out.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-center text-gray-400">ไม่มีรายการ</p>
+            ) : (
               <table className="w-full text-sm">
                 <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
                   <tr>
@@ -90,63 +163,19 @@ export default function StockReportPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {byType.adjust.map((m: any) => (
+                  {byType.out.map((m: any) => (
                     <tr key={m.productId} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5">
                         <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
                         <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
                       </td>
                       <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
-                      <td className={`px-4 py-2.5 text-center font-mono font-bold ${m.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {m.qty > 0 ? '+' : ''}{m.qty}
-                      </td>
+                      <td className="px-4 py-2.5 text-center font-mono font-bold text-red-500">-{m.qty}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {/* In / Out sections */}
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            {[
-              { key: 'in',  label: '📥 ยางรับเข้า', items: byType.in,  cls: 'text-green-600', sign: '+', headerCls: 'bg-green-50 border-green-100' },
-              { key: 'out', label: '📤 ยางขายออก', items: byType.out, cls: 'text-red-500', sign: '-', headerCls: 'bg-red-50 border-red-100' },
-            ].map((section) => (
-              <div key={section.key} className="bg-white rounded-xl border overflow-hidden">
-                <div className={`px-4 py-3 border-b flex items-center justify-between ${section.headerCls}`}>
-                  <span className="font-bold text-gray-800">{section.label}</span>
-                  <span className={`font-bold text-lg ${section.cls}`}>{section.items.length > 0 ? `${section.items.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
-                </div>
-                {section.items.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-center text-gray-400">ไม่มีรายการ</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
-                        <th className="px-4 py-2 text-center">ขอบ</th>
-                        <th className="px-4 py-2 text-center">จำนวน</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {section.items.map((m: any) => (
-                        <tr key={m.productId} className="hover:bg-gray-50">
-                          <td className="px-4 py-2.5">
-                            <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
-                            <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
-                          </td>
-                          <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
-                          <td className={`px-4 py-2.5 text-center font-mono font-bold ${section.cls}`}>
-                            {section.sign}{m.qty}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            ))}
+            )}
           </div>
 
           {/* Movements log */}
