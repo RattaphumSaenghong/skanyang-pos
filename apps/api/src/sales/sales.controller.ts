@@ -36,7 +36,7 @@ export class SalesController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    const shopId = user.role === 'OWNER' ? null : user.shopId;
+    const shopId = user.role === 'OWNER' ? null : user.shopId; // SHOP_OWNER uses their own shopId
     const from = dateFrom ? new Date(dateFrom) : undefined;
     const to = dateTo ? new Date(`${dateTo}T23:59:59`) : undefined;
     return this.service.findByShop(shopId, from, to);

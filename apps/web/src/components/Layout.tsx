@@ -20,21 +20,21 @@ const ownerItems = [
 ];
 
 export default function Layout() {
-  const { user, logout, isOwner, setSelectedShopId } = useAuthStore();
+  const { user, logout, isOwner, isSuperOwner, setSelectedShopId } = useAuthStore();
   const navigate = useNavigate();
 
   const { data: shops = [] } = useQuery<Shop[]>({
     queryKey: ['shops'],
     queryFn: () => api.get('/shops').then((r) => r.data),
-    enabled: isOwner(),
+    enabled: isSuperOwner(),
   });
 
-  // Default to first shop when owner logs in or shops load
+  // Default to first shop when super-owner logs in or shops load
   useEffect(() => {
-    if (isOwner() && shops.length > 0 && !user?.shopId) {
+    if (isSuperOwner() && shops.length > 0 && !user?.shopId) {
       setSelectedShopId(shops[0].id);
     }
-  }, [shops, user?.shopId, isOwner, setSelectedShopId]);
+  }, [shops, user?.shopId, isSuperOwner, setSelectedShopId]);
 
   const handleLogout = () => {
     logout();
@@ -53,8 +53,8 @@ export default function Layout() {
       <aside className="w-56 bg-white border-r flex flex-col">
         <div className="p-4 border-b">
           <p className="font-bold text-lg">ส.การยาง</p>
-          <p className="text-xs text-gray-500">{user?.username} · {user?.role === 'OWNER' ? 'เจ้าของ' : 'พนักงาน'}</p>
-          {isOwner() && shops.length > 0 && (
+          <p className="text-xs text-gray-500">{user?.username} · {user?.role === 'OWNER' ? 'Super Admin' : user?.role === 'SHOP_OWNER' ? 'เจ้าของร้าน' : 'พนักงาน'}</p>
+          {isSuperOwner() && shops.length > 0 && (
             <select
               value={user?.shopId ?? ''}
               onChange={(e) => setSelectedShopId(e.target.value)}
@@ -65,7 +65,7 @@ export default function Layout() {
               ))}
             </select>
           )}
-          {!isOwner() && user?.shopId && (
+          {!isSuperOwner() && user?.shopId && (
             <p className="text-xs text-blue-600 mt-1 font-medium">{selectedShop?.name ?? ''}</p>
           )}
         </div>

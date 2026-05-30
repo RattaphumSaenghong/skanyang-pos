@@ -53,7 +53,8 @@ export default function ProductsImportPage() {
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const effectiveShopId = useAuthStore((s) => s.effectiveShopId());
-  const isOwner = user?.role === 'OWNER';
+  const isOwner = user?.role === 'OWNER' || user?.role === 'SHOP_OWNER';
+  const isSuperOwner = user?.role === 'OWNER';
 
   const inputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -301,7 +302,7 @@ export default function ProductsImportPage() {
       <div className="mt-10">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-bold">แบนเนอร์จอลูกค้า</h3>
-          {isOwner && shops.length > 0 && (
+          {isSuperOwner && shops.length > 0 && (
             <select
               value={bannerShopId}
               onChange={(e) => setBannerShopId(e.target.value)}
