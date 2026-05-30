@@ -227,18 +227,26 @@ export class StockService {
       byProduct.set(m.productId, agg);
     }
 
-    // Group by rim
-    const byRim = new Map<number, { rim: number; tiresOut: number; tiresIn: number; models: any[] }>();
+    const brandPriority = (brand: string) => {
+      const u = brand.toUpperCase();
+      if (u.includes('MICHELIN')) return 0;
+      if (u.includes('BFGOODRICH') || u.includes('BF')) return 1;
+      return 2;
+    };
+
+    // Build in/out/adjust product lists
+    const inList: any[] = [];
+    const outList: any[] = [];
+    const adjustList: any[] = [];
     for (const [productId, agg] of byProduct) {
       const p = productMap.get(productId);
       if (!p) continue;
-      const rim = p.sizeRim ?? 0;
-      const rimGroup = byRim.get(rim) ?? { rim, tiresOut: 0, tiresIn: 0, models: [] };
-      rimGroup.tiresOut += agg.out;
-      rimGroup.tiresIn += agg.in;
-      rimGroup.models.push({ productId, brand: p.brand, model: p.model, sizeNormalized: p.sizeNormalized, out: agg.out, in: agg.in, adjust: agg.adjust });
-      byRim.set(rim, rimGroup);
+      const base = { productId, brand: p.brand, model: p.model, sizeNormalized: p.sizeNormalized, sizeRim: p.sizeRim ?? 0 };
+      if (agg.in > 0) inList.push({ ...base, qty: agg.in });
+      if (agg.out > 0) outList.push({ ...base, qty: agg.out });
+      if (agg.adjust !== 0) adjustList.push({ ...base, qty: agg.adjust });
     }
+    const sortProducts = (arr: any[]) => arr.sort((a, b) => brandPriority(a.brand) - brandPriority(b.brand) || a.sizeRim - b.sizeRim);
 
     // Sales summary for the day
     const sales = await this.prisma.sale.findMany({
@@ -253,18 +261,11 @@ export class StockService {
     return {
       date,
       summary: { tiresOut, tiresIn, totalRevenue, salesCount: sales.length },
-      byRim: [...byRim.values()].sort((a, b) => a.rim - b.rim).map((g) => ({
-        ...g,
-        models: g.models.sort((a: any, b: any) => {
-          const priority = (brand: string) => {
-            const b = brand.toUpperCase();
-            if (b.includes('MICHELIN')) return 0;
-            if (b.includes('BFGOODRICH') || b.includes('BF')) return 1;
-            return 2;
-          };
-          return priority(a.brand) - priority(b.brand);
-        }),
-      })),
+      byType: {
+        in: sortProducts(inList),
+        out: sortProducts(outList),
+        adjust: sortProducts(adjustList),
+      },
       movements: movements.map((m) => {
         const p = productMap.get(m.productId);
         return { id: m.id, type: m.type, qty: m.qty, note: m.note, createdAt: m.createdAt, brand: p?.brand ?? '', model: p?.model ?? '', sizeNormalized: p?.sizeNormalized ?? '' };

@@ -31,7 +31,7 @@ export default function StockReportPage() {
   });
 
   const summary = data?.summary ?? { tiresOut: 0, tiresIn: 0, totalRevenue: 0, salesCount: 0 };
-  const byRim: any[] = data?.byRim ?? [];
+  const byType = data?.byType ?? { in: [], out: [], adjust: [] };
   const movements: any[] = data?.movements ?? [];
 
   return (
@@ -69,71 +69,85 @@ export default function StockReportPage() {
 
       {isLoading ? (
         <p className="text-gray-400 text-sm">กำลังโหลด...</p>
-      ) : byRim.length === 0 ? (
+      ) : movements.length === 0 ? (
         <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
           ไม่มีความเคลื่อนไหวในวันนี้
         </div>
       ) : (
         <>
-          {/* By rim section */}
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">แยกตามขอบล้อ</h3>
-          <div className="space-y-4 mb-8">
-            {byRim.map((group) => (
-              <div key={group.rim} className="bg-white rounded-xl border overflow-hidden">
-                {/* Rim header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
-                  <span className="font-bold text-gray-800">ขอบ {group.rim}"</span>
-                  <div className="flex gap-4 text-sm">
-                    {group.tiresOut > 0 && (
-                      <span className="text-red-600 font-medium">📤 ออก {group.tiresOut} เส้น</span>
-                    )}
-                    {group.tiresIn > 0 && (
-                      <span className="text-green-600 font-medium">📥 เข้า {group.tiresIn} เส้น</span>
-                    )}
-                  </div>
+          {/* In / Out sections */}
+          <div className="grid grid-cols-2 gap-6 mb-8">
+            {[
+              { key: 'out', label: '📤 ยางขายออก', items: byType.out, cls: 'text-red-500', sign: '-', headerCls: 'bg-red-50 border-red-100' },
+              { key: 'in',  label: '📥 ยางรับเข้า', items: byType.in,  cls: 'text-green-600', sign: '+', headerCls: 'bg-green-50 border-green-100' },
+            ].map((section) => (
+              <div key={section.key} className="bg-white rounded-xl border overflow-hidden">
+                <div className={`px-4 py-3 border-b flex items-center justify-between ${section.headerCls}`}>
+                  <span className="font-bold text-gray-800">{section.label}</span>
+                  <span className={`font-bold text-lg ${section.cls}`}>{section.items.length > 0 ? `${section.items.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
                 </div>
-                {/* Models table */}
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-gray-500 uppercase border-b bg-white">
-                    <tr>
-                      <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
-                      <th className="px-4 py-2 text-center text-red-500">ขายออก</th>
-                      <th className="px-4 py-2 text-center text-green-600">รับเข้า</th>
-                      <th className="px-4 py-2 text-center text-yellow-600">ปรับแต่ง</th>
-                      <th className="px-4 py-2 text-center text-gray-600">สุทธิ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {group.models.map((m: any) => {
-                      const net = m.in - m.out + m.adjust;
-                      return (
+                {section.items.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-center text-gray-400">ไม่มีรายการ</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
+                        <th className="px-4 py-2 text-center">ขอบ</th>
+                        <th className="px-4 py-2 text-center">จำนวน</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {section.items.map((m: any) => (
                         <tr key={m.productId} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5">
                             <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
                             <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
                           </td>
-                          <td className="px-4 py-2.5 text-center font-mono">
-                            {m.out > 0 ? <span className="text-red-500 font-semibold">-{m.out}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-mono">
-                            {m.in > 0 ? <span className="text-green-600 font-semibold">+{m.in}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-mono">
-                            {m.adjust !== 0 ? <span className="text-yellow-600 font-semibold">{m.adjust > 0 ? '+' : ''}{m.adjust}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-mono font-bold">
-                            <span className={net > 0 ? 'text-green-600' : net < 0 ? 'text-red-500' : 'text-gray-400'}>
-                              {net > 0 ? '+' : ''}{net}
-                            </span>
+                          <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
+                          <td className={`px-4 py-2.5 text-center font-mono font-bold ${section.cls}`}>
+                            {section.sign}{m.qty}
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             ))}
           </div>
+
+          {/* Adjust section — only shown if there are adjustments */}
+          {byType.adjust.length > 0 && (
+            <div className="bg-white rounded-xl border overflow-hidden mb-8">
+              <div className="px-4 py-3 border-b bg-yellow-50 border-yellow-100">
+                <span className="font-bold text-gray-800">✏️ ปรับแต่งสต็อก</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">รุ่น / ขนาด</th>
+                    <th className="px-4 py-2 text-center">ขอบ</th>
+                    <th className="px-4 py-2 text-center">จำนวน</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {byType.adjust.map((m: any) => (
+                    <tr key={m.productId} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium text-gray-800">{m.brand} {m.model}</p>
+                        <p className="text-xs text-gray-400">{m.sizeNormalized}</p>
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-xs text-gray-500">{m.sizeRim}"</td>
+                      <td className={`px-4 py-2.5 text-center font-mono font-bold ${m.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {m.qty > 0 ? '+' : ''}{m.qty}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Movements log */}
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">บันทึกการเคลื่อนไหวทั้งหมด</h3>
