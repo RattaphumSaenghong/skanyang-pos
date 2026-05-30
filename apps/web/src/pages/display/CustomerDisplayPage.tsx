@@ -135,14 +135,16 @@ export default function CustomerDisplayPage() {
     if (!track || images.length === 0) return;
     cancelAnimationFrame(animRef.current);
     posRef.current = 0;
-    const halfW = track.scrollWidth / 2;
     let last = performance.now();
     const step = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
-      posRef.current += SCROLL_PX_PER_SEC * dt;
-      if (posRef.current >= halfW) posRef.current -= halfW;
-      track.style.transform = `translateX(-${posRef.current}px)`;
+      const halfW = track.scrollWidth / 2;
+      if (halfW > 0) {
+        posRef.current += SCROLL_PX_PER_SEC * dt;
+        if (posRef.current >= halfW) posRef.current -= halfW;
+        track.style.transform = `translateX(-${posRef.current}px)`;
+      }
       animRef.current = requestAnimationFrame(step);
     };
     animRef.current = requestAnimationFrame(step);
