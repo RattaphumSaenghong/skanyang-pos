@@ -8,7 +8,22 @@ import { useAuthStore } from '../../store/auth.store';
 async function downloadAsPdf(ref: React.RefObject<HTMLDivElement>, filename: string) {
   if (!ref.current) return;
   await document.fonts.ready;
-  const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: '#f3f4f6' });
+  const canvas = await html2canvas(ref.current, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#f3f4f6',
+    onclone: (clonedDoc) => {
+      // html2canvas v1 doesn't support oklch (Tailwind v4) — strip those rules
+      Array.from(clonedDoc.styleSheets).forEach((sheet) => {
+        try {
+          const rules = Array.from(sheet.cssRules ?? []);
+          for (let i = rules.length - 1; i >= 0; i--) {
+            if (rules[i].cssText?.includes('oklch')) sheet.deleteRule(i);
+          }
+        } catch { /* cross-origin sheets are read-only — safe to ignore */ }
+      });
+    },
+  });
   const imgData = canvas.toDataURL('image/png');
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
   pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
