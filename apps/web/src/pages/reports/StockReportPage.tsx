@@ -1,33 +1,86 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
 
-async function downloadAsPdf(ref: React.RefObject<HTMLDivElement>, filename: string) {
-  if (!ref.current) return;
-  await document.fonts.ready;
-  const canvas = await html2canvas(ref.current, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#f3f4f6',
-    onclone: (clonedDoc) => {
-      // html2canvas v1 doesn't support oklch (Tailwind v4) — strip those rules
-      Array.from(clonedDoc.styleSheets).forEach((sheet) => {
-        try {
-          const rules = Array.from(sheet.cssRules ?? []);
-          for (let i = rules.length - 1; i >= 0; i--) {
-            if (rules[i].cssText?.includes('oklch')) sheet.deleteRule(i);
-          }
-        } catch { /* cross-origin sheets are read-only — safe to ignore */ }
-      });
-    },
+function buildReportPdf(date: string, byType: { in: any[]; out: any[]; adjust: any[] }, summary: any) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210;
+  let y = 15;
+
+  // Title
+  doc.setFontSize(14).setFont('helvetica', 'bold');
+  doc.text('Stock Daily Report', W / 2, y, { align: 'center' });
+  y += 7;
+  doc.setFontSize(10).setFont('helvetica', 'normal');
+  doc.text(`Date: ${date}   |   In: ${summary.tiresIn} pcs   |   Out: ${summary.tiresOut} pcs   |   Revenue: ${summary.totalRevenue.toLocaleString()} THB`, W / 2, y, { align: 'center' });
+  y += 8;
+
+  const sectionTable = (title: string, rows: any[], color: [number, number, number]) => {
+    doc.setFontSize(11).setFont('helvetica', 'bold');
+    doc.setTextColor(...color);
+    doc.text(title, 14, y);
+    doc.setTextColor(0, 0, 0);
+    y += 2;
+    autoTable(doc, {
+      startY: y,
+      head: [['Brand / Model', 'Size', 'Rim', 'Qty']],
+      body: rows.map((m) => [
+        `${m.brand} ${m.model}`,
+        m.sizeNormalized,
+        `${m.sizeRim}"`,
+        m.qty > 0 ? `+${m.qty}` : `${m.qty}`,
+      ]),
+      headStyles: { fillColor: color, textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center', fontStyle: 'bold' } },
+      margin: { left: 14, right: 14 },
+      theme: 'striped',
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  };
+
+  if (byType.adjust.length > 0) sectionTable('Adjustments', byType.adjust, [180, 120, 0]);
+  if (byType.in.length > 0) sectionTable('Stock In', byType.in, [22, 163, 74]);
+  if (byType.out.length > 0) sectionTable('Stock Out', byType.out, [220, 38, 38]);
+
+  return doc;
+}
+
+function buildLogsPdf(date: string, movements: any[]) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210;
+  let y = 15;
+
+  doc.setFontSize(14).setFont('helvetica', 'bold');
+  doc.text('Stock Movement Audit Log', W / 2, y, { align: 'center' });
+  y += 7;
+  doc.setFontSize(10).setFont('helvetica', 'normal');
+  doc.text(`Date: ${date}   |   ${movements.length} records`, W / 2, y, { align: 'center' });
+  y += 6;
+
+  const TYPE_EN: Record<string, string> = { IN: 'IN', OUT: 'OUT', ADJUST: 'ADJUST', RETURN: 'RETURN' };
+  autoTable(doc, {
+    startY: y,
+    head: [['Time', 'Type', 'Brand / Model', 'Size', 'Qty', 'Note']],
+    body: movements.map((m) => [
+      new Date(m.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      TYPE_EN[m.type] ?? m.type,
+      `${m.brand} ${m.model}`,
+      m.sizeNormalized,
+      m.qty > 0 ? `+${m.qty}` : `${m.qty}`,
+      m.note ?? '—',
+    ]),
+    headStyles: { fillColor: [55, 65, 81], textColor: 255, fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    columnStyles: { 4: { halign: 'center', fontStyle: 'bold' } },
+    margin: { left: 14, right: 14 },
+    theme: 'striped',
   });
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
-  pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
-  pdf.save(filename);
+
+  return doc;
 }
 
 function toDateStr(d: Date) {
@@ -46,8 +99,6 @@ export default function StockReportPage() {
   const shopId = effectiveShopId();
   const today = toDateStr(new Date());
   const [date, setDate] = useState(today);
-  const reportRef = useRef<HTMLDivElement>(null);
-  const logsRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['stock-daily-report', shopId, date],
@@ -73,15 +124,15 @@ export default function StockReportPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => downloadAsPdf(reportRef, `stock-report-${date}.pdf`)}
-            disabled={isLoading}
+            onClick={() => buildReportPdf(date, byType, summary).save(`stock-report-${date}.pdf`)}
+            disabled={isLoading || movements.length === 0}
             className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
           >
             ⬇️ ดาวน์โหลดรายงาน
           </button>
           <button
-            onClick={() => downloadAsPdf(logsRef, `stock-logs-${date}.pdf`)}
-            disabled={isLoading}
+            onClick={() => buildLogsPdf(date, movements).save(`stock-logs-${date}.pdf`)}
+            disabled={isLoading || movements.length === 0}
             className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
           >
             ⬇️ ดาวน์โหลด Audit Log
@@ -120,7 +171,7 @@ export default function StockReportPage() {
         </div>
       ) : (
         <>
-          <div ref={reportRef} className="bg-gray-50 rounded-xl p-4 mb-2">
+          <div className="bg-gray-50 rounded-xl p-4 mb-2">
           {/* Top row: ปรับแต่งสต็อก + ยางรับเข้า side by side */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             {/* ปรับแต่งสต็อก */}
@@ -226,7 +277,7 @@ export default function StockReportPage() {
 
           </div>
 
-          <div ref={logsRef} className="bg-gray-50 rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">บันทึกการเคลื่อนไหวทั้งหมด</h3>
           <div className="bg-white rounded-xl border overflow-hidden">
             <table className="w-full text-sm">
