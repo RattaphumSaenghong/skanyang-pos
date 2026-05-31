@@ -257,7 +257,7 @@ export class StockService {
     const totalRevenue = sales.reduce((s, x) => s + x.totalAmount, 0);
     const tiresOut = [...byProduct.values()].reduce((s, x) => s + x.out, 0);
     const tiresIn = [...byProduct.values()].reduce((s, x) => s + x.in, 0);
-    const adjustCount = adjustList.length;
+    const adjustCount = adjustList.reduce((s: number, m: any) => s + Math.abs(m.qty), 0);
 
     return {
       date,
