@@ -85,7 +85,7 @@ export default function SalesReportPage() {
   });
 
   const cancelQuotationMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/quotations/${id}/cancel`).then((r) => r.data),
+    mutationFn: (id: string) => api.delete(`/quotations/${id}`).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quotations-report'] }),
   });
 
