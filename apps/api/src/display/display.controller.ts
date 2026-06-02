@@ -82,6 +82,11 @@ export class DisplayController {
     return this.service.clearStaffQuotation(shopId, staffId);
   }
 
+  @Delete(':shopId/:staffId/active-quotation/dismiss')
+  dismissStaffQuotation(@Param('shopId') shopId: string, @Param('staffId') staffId: string) {
+    return this.service.clearStaffQuotation(shopId, staffId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post(':shopId/:staffId/search-results')
   setStaffSearchResults(
@@ -114,6 +119,11 @@ export class DisplayController {
   @UseGuards(JwtAuthGuard)
   @Delete(':shopId/active-quotation')
   clearActiveQuotation(@Param('shopId') shopId: string) {
+    return this.service.clearActiveQuotation(shopId);
+  }
+
+  @Delete(':shopId/active-quotation/dismiss')
+  dismissActiveQuotation(@Param('shopId') shopId: string) {
     return this.service.clearActiveQuotation(shopId);
   }
 

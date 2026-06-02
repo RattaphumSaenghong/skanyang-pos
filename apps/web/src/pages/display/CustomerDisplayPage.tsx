@@ -226,6 +226,15 @@ export default function CustomerDisplayPage() {
     </div>
   ) : null;
 
+  const dismissUrl = staffId
+    ? `/api/display/${shopId}/${staffId}/active-quotation/dismiss`
+    : `/api/display/${shopId}/active-quotation/dismiss`;
+
+  function handleDismiss() {
+    fetch(dismissUrl, { method: 'DELETE' }).catch(() => {});
+    setQuotation(null);
+  }
+
   // ─── Quotation overlay (highest priority) ────────────────────────────────
   const quotationLayer = quotation ? (
     <div style={{
@@ -236,8 +245,19 @@ export default function CustomerDisplayPage() {
       <div style={{
         background: '#fff', borderRadius: 16, padding: '2rem 2.5rem',
         width: '100%', maxWidth: 1000, maxHeight: '92vh', overflowY: 'auto',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.5)', position: 'relative',
       }}>
+        <button
+          onClick={handleDismiss}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            background: '#ef4444', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '6px 16px', fontSize: '0.95rem',
+            fontWeight: 700, cursor: 'pointer', zIndex: 10,
+          }}
+        >
+          ✕ ปิด
+        </button>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' }}>
           <p style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>ใบเสนอราคา</p>
