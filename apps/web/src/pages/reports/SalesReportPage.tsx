@@ -84,6 +84,11 @@ export default function SalesReportPage() {
     },
   });
 
+  const cancelQuotationMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/quotations/${id}/cancel`).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quotations-report'] }),
+  });
+
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/sales/${id}/approve`).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales'] }),
@@ -184,7 +189,7 @@ export default function SalesReportPage() {
           {qLoading ? (
             <p className="text-gray-400 text-sm">กำลังโหลด...</p>
           ) : (
-            <QuotationTable quotations={quotations} />
+            <QuotationTable quotations={quotations} onCancel={(id) => cancelQuotationMutation.mutate(id)} cancellingId={cancelQuotationMutation.isPending ? cancelQuotationMutation.variables : undefined} />
           )}
         </>
       )}
@@ -199,7 +204,11 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   CANCELLED: { label: 'ยกเลิก',   cls: 'bg-red-100 text-red-600' },
 };
 
-function QuotationTable({ quotations }: { quotations: Quotation[] }) {
+function QuotationTable({ quotations, onCancel, cancellingId }: {
+  quotations: Quotation[];
+  onCancel: (id: string) => void;
+  cancellingId?: string;
+}) {
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
       <table className="w-full text-sm">
@@ -210,15 +219,17 @@ function QuotationTable({ quotations }: { quotations: Quotation[] }) {
             <th className="px-4 py-3 text-left">ยางที่เสนอ</th>
             <th className="px-4 py-3 text-left">ทะเบียน</th>
             <th className="px-4 py-3 text-center">สถานะ</th>
+            <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody className="divide-y">
           {quotations.length === 0 ? (
-            <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">ไม่มีข้อมูล</td></tr>
+            <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">ไม่มีข้อมูล</td></tr>
           ) : (
             quotations.map((q) => {
               const tires = q.items.map((i) => `${i.product.brand} ${i.product.sizeNormalized}`).join(', ');
               const badge = STATUS_BADGE[q.status] ?? { label: q.status, cls: 'bg-gray-100 text-gray-600' };
+              const canCancel = q.status !== 'CONVERTED' && q.status !== 'CANCELLED';
               return (
                 <tr key={q.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono font-medium">#{String(q.number).padStart(5, '0')}</td>
@@ -229,6 +240,17 @@ function QuotationTable({ quotations }: { quotations: Quotation[] }) {
                   <td className="px-4 py-3 text-gray-500">{q.plateNumber ?? '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {canCancel && (
+                      <button
+                        disabled={cancellingId === q.id}
+                        onClick={() => onCancel(q.id)}
+                        className="px-3 py-1 text-xs font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+                      >
+                        {cancellingId === q.id ? '...' : 'ยกเลิก'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
