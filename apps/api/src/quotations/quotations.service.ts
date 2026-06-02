@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 
@@ -133,8 +134,27 @@ export class QuotationsService {
     });
   }
 
+  @Cron('* * * * *') // every minute
+  async cleanupAllStaleDrafts() {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+    const stale = await this.prisma.quotation.findMany({
+      where: { status: 'DRAFT', createdAt: { lt: cutoff } },
+      select: { id: true, shopId: true },
+    });
+    if (stale.length === 0) return;
+    const ids = stale.map((q) => q.id);
+    const shopIds = [...new Set(stale.map((q) => q.shopId))];
+    await Promise.all(shopIds.map((sid) =>
+      this.prisma.shop.updateMany({
+        where: { id: sid, activeDisplayQuotationId: { in: ids } },
+        data: { activeDisplayQuotationId: null },
+      })
+    ));
+    await this.prisma.quotation.updateMany({ where: { id: { in: ids } }, data: { status: 'CANCELLED' } });
+  }
+
   async cleanupStaleDrafts(shopId: string) {
-    const cutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 min ago
     const stale = await this.prisma.quotation.findMany({
       where: { shopId, status: 'DRAFT', createdAt: { lt: cutoff } },
       select: { id: true },
