@@ -489,7 +489,13 @@ export default function StockDashboardPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg border hover:bg-gray-200"
+                >
+                  🖨️ พิมพ์
+                </button>
                 <button
                   onClick={handleSaveSnapshot}
                   disabled={saveSnapshotMutation.isPending}

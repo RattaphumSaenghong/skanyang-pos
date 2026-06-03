@@ -8,8 +8,23 @@
 }
 
 @media print {
-  nav, aside, header, button, .no-print { display: none !important; }
+  nav, aside, header, button, select, input[type="text"], input[type="search"], .no-print { display: none !important; }
   main { overflow: visible !important; }
   body { background: white; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Show number inputs as plain text in snapshot table */
+  input[type="number"] {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: center;
+    width: auto !important;
+    pointer-events: none;
+  }
+
+  /* Keep table borders visible */
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #d1d5db; padding: 6px 10px; }
+  thead { background-color: #f9fafb !important; }
 }
