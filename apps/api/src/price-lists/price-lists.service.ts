@@ -9,11 +9,11 @@ const THAI_MONTHS: Record<string, number> = {
 };
 
 const BRAND_MAP: Record<string, string> = {
-  XCD: 'MICHELIN', AGI: 'MICHELIN', AGILIS: 'MICHELIN',
-  PS: 'MICHELIN', TOUR: 'MICHELIN', PRIM: 'MICHELIN', PILOT: 'MICHELIN',
-  ENERG: 'MICHELIN', CROSS: 'MICHELIN', LTX: 'MICHELIN',
-  BF: 'BF GOODRICH', KO: 'BF GOODRICH', TERRA: 'BF GOODRICH',
-  DUELER: 'BRIDGESTONE', TURANZ: 'BRIDGESTONE',
+  XCD: 'Michelin', AGI: 'Michelin', AGILIS: 'Michelin',
+  PS: 'Michelin', TOUR: 'Michelin', PRIM: 'Michelin', PILOT: 'Michelin',
+  ENERG: 'Michelin', CROSS: 'Michelin', LTX: 'Michelin',
+  BF: 'BFGoodrich', KO: 'BFGoodrich', TERRA: 'BFGoodrich',
+  DUELER: 'Bridgestone', TURANZ: 'Bridgestone',
 };
 
 function inferBrand(model: string): string {

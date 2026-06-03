@@ -47,21 +47,21 @@ const PRINT_KEYWORDS = ['ปริ้น', 'print', 'ปริ้นท์'];
 
 // Col A model prefix → brand name
 const BRAND_BY_PREFIX: Array<[string, string]> = [
-  ['XCD', 'MICHELIN'],
-  ['AGI', 'MICHELIN'],
-  ['PS', 'MICHELIN'],
-  ['PILOT', 'MICHELIN'],
-  ['PRIM', 'MICHELIN'],
-  ['ENERG', 'MICHELIN'],
-  ['CROSS', 'MICHELIN'],
-  ['LTX', 'MICHELIN'],
-  ['TOUR', 'MICHELIN'],
-  ['TRAIL', 'MICHELIN'],
-  ['BF', 'BF GOODRICH'],
-  ['KO', 'BF GOODRICH'],
-  ['TERRA', 'BF GOODRICH'],
-  ['DUELER', 'BRIDGESTONE'],
-  ['TURANZ', 'BRIDGESTONE'],
+  ['XCD', 'Michelin'],
+  ['AGI', 'Michelin'],
+  ['PS', 'Michelin'],
+  ['PILOT', 'Michelin'],
+  ['PRIM', 'Michelin'],
+  ['ENERG', 'Michelin'],
+  ['CROSS', 'Michelin'],
+  ['LTX', 'Michelin'],
+  ['TOUR', 'Michelin'],
+  ['TRAIL', 'Michelin'],
+  ['BF', 'BFGoodrich'],
+  ['KO', 'BFGoodrich'],
+  ['TERRA', 'BFGoodrich'],
+  ['DUELER', 'Bridgestone'],
+  ['TURANZ', 'Bridgestone'],
 ];
 
 export function inferBrand(model: string): string {
@@ -205,7 +205,7 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
       const model = modelRaw ? String(modelRaw).trim() : '';
       if (!model) { skipped++; continue; }
 
-      const brand = brandRaw ? String(brandRaw).trim().toUpperCase() : inferBrand(model);
+      const brand = brandRaw ? String(brandRaw).trim() : inferBrand(model);
 
       // DOT year: extracted from *NN suffix in the size string (preserved in sizeNormalized).
       const dotYear = (() => { const m = sizeStr.match(/\*(\d+)$/); return m ? m[1] : null; })();
