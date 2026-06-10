@@ -36,6 +36,13 @@ interface SearchEntry {
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
 
 function buildPaymentRows(item: QuotationItem): PaymentRow[] {
+  if (!item.isSetPricing && item.qty % 4 !== 0) {
+    return [
+      { label: '0%', unitPrice: item.unitPriceZeroPct, discCard: 0, discCash: 0, discPromo: 0, note: '0% 4เดือน' },
+      { label: 'บัตร', unitPrice: item.unitPriceCard, discCard: item.discCard ?? 0, discCash: 0, discPromo: 0, note: 'รูดบัตรเต็มจำนวน' },
+      { label: 'สด', unitPrice: item.unitPriceCash, discCard: 0, discCash: item.discCash ?? 0, discPromo: 0, note: 'ขายเส้น (ราคาสด)' },
+    ];
+  }
   return [
     { label: '0%', unitPrice: item.unitPriceZeroPct, discCard: 0, discCash: 0, discPromo: item.discPromo ?? 0, note: '0% 10 เดือน' },
     { label: 'บัตร', unitPrice: item.unitPriceCard, discCard: item.discCard ?? 0, discCash: 0, discPromo: item.discPromo ?? 0, note: 'รูดบัตรเต็มจำนวน' },
@@ -195,7 +202,7 @@ export default function CustomerDisplayPage() {
               <th style={{ padding: '10px 16px', textAlign: 'left', color: '#94a3b8', fontWeight: 600 }}>สินค้า</th>
               <th style={{ padding: '10px 16px', textAlign: 'right', color: '#94a3b8', fontWeight: 600 }}>เงินสด</th>
               <th style={{ padding: '10px 16px', textAlign: 'right', color: '#94a3b8', fontWeight: 600 }}>บัตรเครดิต</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', color: '#94a3b8', fontWeight: 600 }}>0% 10 เดือน</th>
+              <th style={{ padding: '10px 16px', textAlign: 'right', color: '#94a3b8', fontWeight: 600 }}>0% รูดบัตร</th>
             </tr>
           </thead>
           <tbody>
@@ -292,12 +299,12 @@ export default function CustomerDisplayPage() {
               return rows.map((row, rowIdx) => (
                 <tr key={`${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 600 }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 600 }}>
                       {idx + 1}
                     </td>
                   )}
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle', width: 80 }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle', width: 80 }}>
                       {item.product.imageUrl ? (
                         <img src={item.product.imageUrl} alt="" style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 6, background: '#f3f4f6', display: 'block', margin: '0 auto' }} />
                       ) : (
@@ -306,7 +313,7 @@ export default function CustomerDisplayPage() {
                     </td>
                   )}
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '10px 12px', verticalAlign: 'middle' }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '10px 12px', verticalAlign: 'middle' }}>
                       <p style={{ fontWeight: 700, fontSize: '1rem' }}>{item.product.brand} {item.product.model}</p>
                       <p style={{ color: '#6b7280', fontSize: '0.82rem', marginTop: 2 }}>
                         {item.product.sizeNormalized}
@@ -316,12 +323,12 @@ export default function CustomerDisplayPage() {
                     </td>
                   )}
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>
                       {(item.priceListed ?? 0).toLocaleString()}
                     </td>
                   )}
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', verticalAlign: 'middle', fontFamily: 'monospace' }}>
                       {(item.discTradeIn ?? 0) > 0 ? (item.discTradeIn).toLocaleString() : '—'}
                     </td>
                   )}
@@ -335,11 +342,11 @@ export default function CustomerDisplayPage() {
                     {row.unitPrice.toLocaleString()}
                   </td>
                   {rowIdx === 0 && (
-                    <td rowSpan={3} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, fontSize: '1.1rem' }}>
+                    <td rowSpan={rows.length} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, fontSize: '1.1rem' }}>
                       {item.qty}
                     </td>
                   )}
-                  <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === 2 ? '#15803d' : '#111' }}>
+                  <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>
                     {(row.unitPrice * item.qty).toLocaleString()}
                   </td>
                   <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', color: '#6b7280', fontSize: '0.82rem' }}>{row.note}</td>

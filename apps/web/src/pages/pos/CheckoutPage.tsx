@@ -9,7 +9,7 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   CASH: 'เงินสด',
   TRANSFER: 'เงินโอน',
   CARD: 'รูดบัตร',
-  ZERO_PCT: '0% 10 เดือน',
+  ZERO_PCT: '0% รูดบัตร',
 };
 
 export default function CheckoutPage() {
@@ -74,7 +74,12 @@ export default function CheckoutPage() {
 
   const items = quotation.items ?? [];
   const unitPrice = (item: any) => {
-    if (!item.isSetPricing || item.qty % 4 !== 0) return item.unitPriceCash;
+    const isIndividual = !item.isSetPricing || item.qty % 4 !== 0;
+    if (isIndividual) {
+      if (method === 'ZERO_PCT') return item.unitPriceZeroPct;
+      if (method === 'CARD') return item.unitPriceCard;
+      return item.unitPriceCash;
+    }
     if (method === 'CARD') return item.unitPriceCard;
     if (method === 'ZERO_PCT') return item.unitPriceZeroPct;
     return item.unitPriceCash;

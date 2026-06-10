@@ -27,14 +27,32 @@ function paymentRowClass(label: string): string {
 
 function buildPaymentRows(item: any): PaymentRow[] {
   if (!item.isSetPricing && item.qty % 4 !== 0) {
-    return [{
-      label: 'สด',
-      unitPrice: item.unitPriceCash,
-      discCard: 0,
-      discCash: 0,
-      discPromo: 0,
-      note: 'ขายเส้น (ราคาสด)',
-    }];
+    return [
+      {
+        label: '0%',
+        unitPrice: item.unitPriceZeroPct,
+        discCard: 0,
+        discCash: 0,
+        discPromo: 0,
+        note: '0% 4เดือน',
+      },
+      {
+        label: 'บัตร',
+        unitPrice: item.unitPriceCard,
+        discCard: item.discCard ?? 0,
+        discCash: 0,
+        discPromo: 0,
+        note: 'รูดบัตรเต็มจำนวน',
+      },
+      {
+        label: 'สด',
+        unitPrice: item.unitPriceCash,
+        discCard: 0,
+        discCash: item.discCash ?? 0,
+        discPromo: 0,
+        note: 'ขายเส้น (ราคาสด)',
+      },
+    ];
   }
   return [
     {
