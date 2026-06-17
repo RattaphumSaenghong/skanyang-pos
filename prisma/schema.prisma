@@ -60,9 +60,9 @@ model Product {
   sku            String
   brand          String
   model          String
-  sizeWidth      Int
+  sizeWidth      Float
   sizeSeries     Int
-  sizeRim        Int
+  sizeRim        Float
   sizeNormalized String
   sizeRaw        String
   isSetPricing   Boolean  @default(false)

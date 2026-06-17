@@ -72,23 +72,32 @@ export function inferBrand(model: string): string {
   return 'MICHELIN';
 }
 
-/** Normalize any tire size string to "205/55-16" or "205/55-16*25" format */
+/** Normalize any tire size string to "205/55-16", "205/55-16*25", or "9.5R17.5" format */
 export function normalizeSize(raw: string): string {
-  const s = raw.trim().toUpperCase();
+  const s = raw.trim().toUpperCase().replace(/\/\s*$/, '').trim(); // strip trailing slash
   const dotMatch = s.match(/\*(\d+)$/);
   const dotSuffix = dotMatch ? `*${dotMatch[1]}` : '';
   let base = s.replace(/\*\d+$/, '').trim();
-  base = base.replace(/R(\d{2})\b/, '-$1');
-  const m = base.match(/(\d{3})\s*[/]\s*(\d{2})\s*[-]\s*(\d{2})/);
+  // Passenger R-notation (205/55R16 → 205/55-16, 385/65R22.5 → 385/65-22.5).
+  // Scoped to the aspect-ratio slash so commercial sizes (9.5R17.5, 11R20)
+  // keep their R for the commercial parser. Rim may be a decimal (e.g. 17.5).
+  base = base.replace(/(\d{3})\s*\/\s*(\d{2})R(\d{2}(?:\.\d+)?)/, '$1/$2-$3');
+  // Passenger: 205/55-16 or 385/65-22.5
+  const m = base.match(/(\d{3})\s*[/]\s*(\d{2})\s*[-]\s*(\d{2}(?:\.\d+)?)/);
   if (m) return `${m[1]}/${m[2]}-${m[3]}${dotSuffix}`;
+  // Commercial float format stays as-is: 9.5R17.5, 11R22.5
   return base + dotSuffix;
 }
 
 function parseSizeParts(normalized: string): { width: number; series: number; rim: number } | null {
   const base = normalized.replace(/\*\d+$/, '');
-  const m = base.match(/^(\d{3})\/(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  return { width: parseInt(m[1]), series: parseInt(m[2]), rim: parseInt(m[3]) };
+  // Passenger: 205/55-16 or 385/65-22.5
+  const pm = base.match(/^(\d{3})\/(\d{2})-(\d{2}(?:\.\d+)?)$/);
+  if (pm) return { width: parseInt(pm[1]), series: parseInt(pm[2]), rim: parseFloat(pm[3]) };
+  // Commercial float: 9.5R17.5 or 11R22.5 — series=0 signals no aspect ratio
+  const cm = base.match(/^(\d+\.?\d*)R(\d+\.?\d*)$/);
+  if (cm) return { width: parseFloat(cm[1]), series: 0, rim: parseFloat(cm[2]) };
+  return null;
 }
 
 export function roundUp50(x: number): number {
