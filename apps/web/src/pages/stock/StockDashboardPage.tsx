@@ -55,6 +55,7 @@ export default function StockDashboardPage() {
   const user = useAuthStore((s) => s.user);
   const globalShopId = useAuthStore((s) => s.effectiveShopId());
   const isOwner = user?.role === 'OWNER';
+  const canEdit = user?.role !== 'STAFF'; // STAFF can view stock but not adjust it
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>('today');
@@ -256,7 +257,7 @@ export default function StockDashboardPage() {
                     <th className="px-4 py-3 text-left">ขนาด</th>
                     {!effectiveShopId && <th className="px-4 py-3 text-left">สาขา</th>}
                     <th className="px-4 py-3 text-right">คงเหลือ</th>
-                    <th className="px-4 py-3 text-center">ปรับ</th>
+                    {canEdit && <th className="px-4 py-3 text-center">ปรับ</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -282,6 +283,7 @@ export default function StockDashboardPage() {
                         <td className="px-4 py-3 text-right font-mono font-semibold">
                           {optimisticQty}
                         </td>
+                        {canEdit && (
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -338,6 +340,7 @@ export default function StockDashboardPage() {
                             )}
                           </div>
                         </td>
+                        )}
                       </tr>
                     );
                   })}
