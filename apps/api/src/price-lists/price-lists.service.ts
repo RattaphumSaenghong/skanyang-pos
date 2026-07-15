@@ -121,6 +121,8 @@ export class PriceListsService {
             data: {
               brand,
               sortOrder: row.sortOrder,
+              isSetPricing: row.isSetPricing,
+              isNonPromo: row.isNonPromo,
               ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
             },
           });
