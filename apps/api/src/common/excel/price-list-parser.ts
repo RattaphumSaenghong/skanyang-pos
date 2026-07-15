@@ -13,6 +13,7 @@ export interface ParsedPriceRow {
   sizeRim: number;
   dotYear: string | null;
   isSetPricing: boolean;
+  isNonPromo: boolean;
   arp: number | null;
   priceListed: number;
   costNormal: number;
@@ -41,6 +42,9 @@ export interface ParseResult {
 
 // Rows with this fill color are "sell as set of 4"
 const PINK_RGB = 'FF99FF';
+
+// Rows with this fill color are "non promo" (no promo discount)
+const RED_RGB = 'FF5050';
 
 // Keywords that identify print/layout sheets to skip
 const PRINT_KEYWORDS = ['ปริ้น', 'print', 'ปริ้นท์'];
@@ -222,6 +226,8 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
       // Set pricing = pink fill (FF99FF) on col B (model column)
       const fillRgb = getFillRgb(ws, r, 1);
       const isSetPricing = fillRgb === PINK_RGB;
+      // Non promo = red fill (FF5050) on col B (model column)
+      const isNonPromo = fillRgb === RED_RGB;
 
       // Prices & costs
       //   E(4)=ARP   F(5)=listed   G(6)=discPromo   H(7)=discTradeIn
@@ -297,6 +303,7 @@ export function parsePriceListExcel(buffer: Buffer): ParseResult {
         sizeRim: parts.rim,
         dotYear,
         isSetPricing,
+        isNonPromo,
         arp,
         priceListed,
         costNormal,

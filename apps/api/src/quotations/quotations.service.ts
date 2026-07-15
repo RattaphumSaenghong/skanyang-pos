@@ -48,6 +48,7 @@ export class QuotationsService {
               priceEntryId: item.priceEntryId,
               qty: item.qty,
               isSetPricing: entry.product.isSetPricing,
+              isNonPromo: entry.product.isNonPromo,
               isIndividual: item.isIndividual ?? false,
               unitPriceCash: entry.priceCash,
               unitPriceCard: entry.priceCard,

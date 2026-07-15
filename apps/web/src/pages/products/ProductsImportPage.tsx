@@ -46,7 +46,7 @@ interface ActiveEntry {
   costNormal: number;
   costPromo: number | null;
   marginCash: number | null;
-  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; dotYear: string | null };
+  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear: string | null };
 }
 
 export default function ProductsImportPage() {
@@ -396,6 +396,9 @@ export default function ProductsImportPage() {
                         {e.product.dotYear && <p className="text-xs text-gray-400">DOT {e.product.dotYear}</p>}
                         {e.product.isSetPricing && (
                           <span className="text-xs bg-pink-100 text-pink-700 border border-pink-200 font-bold px-1.5 rounded">ชุด 4 เส้น</span>
+                        )}
+                        {e.product.isNonPromo && (
+                          <span className="text-xs bg-red-100 text-red-700 border border-red-200 font-bold px-1.5 rounded">Non Promo</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-gray-600 font-mono text-xs">{e.product.sizeNormalized}</td>

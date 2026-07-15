@@ -35,7 +35,7 @@ export class DisplayService {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: quotationId },
       include: {
-        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, imageUrl: true } } } },
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, imageUrl: true } } } },
         customer: { select: { name: true } },
       },
     });
@@ -123,7 +123,7 @@ export class DisplayService {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: shop.activeDisplayQuotationId },
       include: {
-        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, imageUrl: true } } } },
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, imageUrl: true } } } },
         customer: { select: { name: true } },
       },
     });

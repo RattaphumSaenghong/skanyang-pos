@@ -17,7 +17,7 @@ interface PriceEntry {
   costPromo?: number | null;
   qtyOnHand: number;
   qtyAvailable: number;
-  product: { sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; dotYear?: string | null };
+  product: { sku: string; brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null };
 }
 
 export default function PosSearchPage() {
@@ -178,7 +178,7 @@ export default function PosSearchPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium">{e.product.brand} {e.product.model}</p>
-                      <p className="text-gray-500 text-xs">{e.product.sizeNormalized}{e.product.isSetPricing ? ' (ชุด 4 เส้น)' : ''}</p>
+                      <p className="text-gray-500 text-xs">{e.product.sizeNormalized}{e.product.isSetPricing ? ' (ชุด 4 เส้น)' : ''}{e.product.isNonPromo ? ' (Non Promo)' : ''}</p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCard.toLocaleString()}</td>

@@ -49,6 +49,7 @@ export class ProductsService {
           model: entry.product.model,
           sizeNormalized: entry.product.sizeNormalized,
           isSetPricing: entry.product.isSetPricing,
+          isNonPromo: entry.product.isNonPromo,
           dotYear: entry.product.dotYear,
         },
         priceListed: entry.priceListed,

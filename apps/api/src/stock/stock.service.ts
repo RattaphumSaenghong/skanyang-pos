@@ -17,7 +17,7 @@ export class StockService {
           qtyOnHand: true,
           qtyReserved: true,
           shop: { select: { id: true, name: true } },
-          product: { select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, sizeWidth: true, sizeSeries: true, sizeRim: true, dotYear: true, isSetPricing: true } },
+          product: { select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, sizeWidth: true, sizeSeries: true, sizeRim: true, dotYear: true, isSetPricing: true, isNonPromo: true } },
         },
         orderBy: [{ product: { sortOrder: 'asc' } }],
       });
@@ -50,6 +50,7 @@ export class StockService {
         sizeRim: p.sizeRim,
         dotYear: p.dotYear,
         isSetPricing: p.isSetPricing,
+        isNonPromo: p.isNonPromo,
       },
     }));
   }

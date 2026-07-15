@@ -14,7 +14,7 @@ interface StockItem {
   qtyOnHand: number;
   qtyReserved: number;
   shop: { id: string; name: string };
-  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; dotYear: string | null; isSetPricing: boolean };
+  product: { id: string; sku: string; brand: string; model: string; sizeNormalized: string; dotYear: string | null; isSetPricing: boolean; isNonPromo: boolean };
 }
 
 interface SnapshotMovement {
@@ -272,6 +272,9 @@ export default function StockDashboardPage() {
                           )}
                           {item.product.isSetPricing && (
                             <span className="ml-1 text-xs text-pink-700 bg-pink-100 border border-pink-200 rounded px-1.5 py-0.5 font-bold">ชุด 4</span>
+                          )}
+                          {item.product.isNonPromo && (
+                            <span className="ml-1 text-xs text-red-700 bg-red-100 border border-red-200 rounded px-1.5 py-0.5 font-bold">Non Promo</span>
                           )}
                         </td>
                         <td className="px-4 py-3 font-mono text-sm text-gray-700">

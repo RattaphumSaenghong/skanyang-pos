@@ -219,10 +219,7 @@ export default function QuotationPage() {
 
   const items = quotation.items ?? [];
 
-  const shopPrefix = shop?.name
-    ? shop.name.replace(/[^a-zA-Zก-๙]/g, '').slice(0, 2).toUpperCase()
-    : '';
-  const qNum = `${shopPrefix}${String(quotation.number).padStart(5, '0')}`;
+  const qNum = `PO${String(quotation.number).padStart(5, '0')}`;
 
   // ─── Print-only view ─────────────────────────────────────────────────────
   const printView = (
@@ -283,9 +280,10 @@ export default function QuotationPage() {
                     }}>
                       {rowIdx === 0 && <p style={{ fontWeight: 700 }}>{item.product?.brand} {item.product?.model}</p>}
                       {rowIdx === 1 && <p style={{ color: '#374151', fontSize: '0.75rem' }}>{item.product?.sizeNormalized}</p>}
-                      {rowIdx === last && (item.isSetPricing || item.product?.dotYear) && (
+                      {rowIdx === last && (item.isSetPricing || item.product?.isNonPromo || item.product?.dotYear) && (
                         <p style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                           {item.isSetPricing && <span style={{ background: '#fce7f3', color: '#be185d', border: '1px solid #f9a8d4', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>ชุด 4 เส้น</span>}
+                          {item.product?.isNonPromo && <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>Non Promo</span>}
                           {item.product?.dotYear && <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px' }}>DOT {item.product.dotYear}</span>}
                         </p>
                       )}
@@ -473,11 +471,16 @@ export default function QuotationPage() {
                         {item.product?.brand} {item.product?.model}
                       </p>
                       <p className="text-gray-500">{item.product?.sizeNormalized}</p>
-                      {(item.isSetPricing || item.product?.dotYear) && (
+                      {(item.isSetPricing || item.product?.isNonPromo || item.product?.dotYear) && (
                         <div className="flex gap-1 flex-wrap mt-0.5">
                           {item.isSetPricing && (
                             <span className="inline-block bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold px-1.5 py-0.5 rounded">
                               ชุด 4 เส้น
+                            </span>
+                          )}
+                          {item.product?.isNonPromo && (
+                            <span className="inline-block bg-red-100 text-red-700 border border-red-200 text-xs font-bold px-1.5 py-0.5 rounded">
+                              Non Promo
                             </span>
                           )}
                           {item.product?.dotYear && (

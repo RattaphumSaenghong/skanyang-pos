@@ -109,6 +109,7 @@ export class PriceListsService {
               sizeNormalized: row.sizeNormalized,
               sizeRaw: row.sizeRaw,
               isSetPricing: row.isSetPricing,
+              isNonPromo: row.isNonPromo,
               dotYear: row.dotYear,
               sortOrder: row.sortOrder,
               ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
@@ -287,7 +288,7 @@ export class PriceListsService {
         costPromo: true,
         marginCash: true,
         product: {
-          select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, isSetPricing: true, dotYear: true, active: true, imageUrl: true },
+          select: { id: true, sku: true, brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, dotYear: true, active: true, imageUrl: true },
         },
       },
       orderBy: [{ product: { sortOrder: 'asc' } }],

@@ -66,6 +66,7 @@ model Product {
   sizeNormalized String
   sizeRaw        String
   isSetPricing   Boolean  @default(false)
+  isNonPromo     Boolean  @default(false)
   dotYear        String?
   sortOrder      Int      @default(0)
   active         Boolean  @default(true)
@@ -213,6 +214,7 @@ model QuotationItem {
   priceEntryId String
   qty          Int
   isSetPricing Boolean   @default(false)
+  isNonPromo   Boolean   @default(false)
 
   unitPriceCash    Float
   unitPriceCard    Float

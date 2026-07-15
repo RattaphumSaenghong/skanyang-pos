@@ -15,7 +15,7 @@ interface QuotationItem {
   discCard: number;
   discCash: number;
   discPromo: number;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; imageUrl: string | null };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; imageUrl: string | null };
 }
 
 interface ActiveQuotation {
@@ -27,7 +27,7 @@ interface ActiveQuotation {
 
 interface SearchEntry {
   id: string;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean };
   priceCash: number;
   priceCard: number;
   priceZeroPct: number;
@@ -61,6 +61,19 @@ function SetBadge() {
       fontWeight: 700, padding: '1px 7px', marginLeft: 6, verticalAlign: 'middle',
     }}>
       ชุด 4 เส้น
+    </span>
+  );
+}
+
+// Red badge for non-promo items
+function NonPromoBadge() {
+  return (
+    <span style={{
+      display: 'inline-block', background: '#fee2e2', color: '#b91c1c',
+      border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.72rem',
+      fontWeight: 700, padding: '1px 7px', marginLeft: 6, verticalAlign: 'middle',
+    }}>
+      Non Promo
     </span>
   );
 }
@@ -212,6 +225,7 @@ export default function CustomerDisplayPage() {
                   <p style={{ fontWeight: 700, fontSize: '1.2rem' }}>
                     {e.product.brand} {e.product.model}
                     {e.product.isSetPricing && <SetBadge />}
+                    {e.product.isNonPromo && <NonPromoBadge />}
                     {e.product.dotYear && <DotBadge year={e.product.dotYear} />}
                   </p>
                   <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: 2 }}>{e.product.sizeNormalized}</p>
@@ -296,6 +310,7 @@ export default function CustomerDisplayPage() {
             {quotation.items.map((item, idx) => {
               const rows = buildPaymentRows(item);
               const isSet = item.isSetPricing || item.product.isSetPricing;
+              const isNonPromo = item.product.isNonPromo;
               return rows.map((row, rowIdx) => (
                 <tr key={`${item.id}-${rowIdx}`} style={{ background: row.label === '0%' ? '#fdf2f8' : row.label === 'บัตร' ? '#f0f9ff' : '#f0fdf4' }}>
                   {rowIdx === 0 && (
@@ -318,6 +333,7 @@ export default function CustomerDisplayPage() {
                       <p style={{ color: '#6b7280', fontSize: '0.82rem', marginTop: 2 }}>
                         {item.product.sizeNormalized}
                         {isSet && <SetBadge />}
+                        {isNonPromo && <NonPromoBadge />}
                         {item.product.dotYear && <DotBadge year={item.product.dotYear} />}
                       </p>
                     </td>
