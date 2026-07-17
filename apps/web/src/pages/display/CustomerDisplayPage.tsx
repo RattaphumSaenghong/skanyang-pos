@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 interface DisplayImage { id: string; url: string; }
@@ -50,7 +50,8 @@ function buildPaymentRows(item: QuotationItem): PaymentRow[] {
   ];
 }
 
-const SCROLL_PX_PER_SEC = 80;
+const CAROUSEL_INTERVAL_MS = 3500;
+const CAROUSEL_VISIBLE_RANGE = 2;
 
 // Pink badge for set-pricing items
 function SetBadge() {
@@ -95,12 +96,11 @@ export default function CustomerDisplayPage() {
   const { shopId, staffId } = useParams<{ shopId: string; staffId?: string }>();
   const [images, setImages] = useState<DisplayImage[]>([]);
   const [quotation, setQuotation] = useState<ActiveQuotation | null>(null);
-  const [promoText, setPromoText] = useState<string | null>(null);
+  const [promoTextMichelin, setPromoTextMichelin] = useState<string | null>(null);
+  const [promoTextBfGoodrich, setPromoTextBfGoodrich] = useState<string | null>(null);
   const [searchEntries, setSearchEntries] = useState<SearchEntry[] | null>(null);
   const [shopInfo, setShopInfo] = useState<{ name: string; phone?: string; address?: string } | null>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const animRef = useRef<number>(0);
-  const posRef = useRef(0);
+  const [centerIndex, setCenterIndex] = useState(0);
 
   const stateUrl = staffId
     ? `/api/display/${shopId}/${staffId}/state`
@@ -134,10 +134,11 @@ export default function CustomerDisplayPage() {
     const go = () =>
       fetch(stateUrl)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: { mode: string; quotation?: ActiveQuotation; promoText?: string | null } | null) => {
+        .then((d: { mode: string; quotation?: ActiveQuotation; promoTextMichelin?: string | null; promoTextBfGoodrich?: string | null } | null) => {
           if (d !== null) {
             setQuotation(d?.mode === 'quotation' ? (d.quotation ?? null) : null);
-            setPromoText(d?.promoText ?? null);
+            setPromoTextMichelin(d?.promoTextMichelin ?? null);
+            setPromoTextBfGoodrich(d?.promoTextBfGoodrich ?? null);
           }
         })
         .catch(() => {});
@@ -158,41 +159,53 @@ export default function CustomerDisplayPage() {
     return () => clearInterval(t);
   }, [searchUrl]);
 
-  // Continuous horizontal scroll
+  // Reset to first slide whenever the image set changes
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track || images.length === 0) return;
-    cancelAnimationFrame(animRef.current);
-    posRef.current = 0;
-    let last = performance.now();
-    const step = (now: number) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      const halfW = track.scrollWidth / 2;
-      if (halfW > 0) {
-        posRef.current += SCROLL_PX_PER_SEC * dt;
-        if (posRef.current >= halfW) posRef.current -= halfW;
-        track.style.transform = `translateX(-${posRef.current}px)`;
-      }
-      animRef.current = requestAnimationFrame(step);
-    };
-    animRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [images]);
+    setCenterIndex(0);
+  }, [images.length]);
 
-  // ─── Base layer: banner scroll ───────────────────────────────────────────
+  // Auto-advance the carousel
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const t = setInterval(() => {
+      setCenterIndex((i) => (i + 1) % images.length);
+    }, CAROUSEL_INTERVAL_MS);
+    return () => clearInterval(t);
+  }, [images.length]);
+
+  // ─── Base layer: 3D rotating carousel ────────────────────────────────────
   const bannerLayer = (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       {images.length === 0 ? (
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <span style={{ color: '#fff', fontSize: '4rem', fontWeight: 800, letterSpacing: 2 }}>{shopInfo?.name ?? '—'}</span>
-        </div>
+        <span style={{ color: '#fff', fontSize: '4rem', fontWeight: 800, letterSpacing: 2 }}>{shopInfo?.name ?? '—'}</span>
       ) : (
-        <div ref={trackRef} style={{ display: 'flex', willChange: 'transform' }}>
-          {[...images, ...images].map((img, i) => (
-            <img key={`${img.id}-${i}`} src={img.url} alt=""
-              style={{ height: '100vh', width: 'auto', maxWidth: '100vw', objectFit: 'cover', flexShrink: 0 }} />
-          ))}
+        <div style={{ position: 'relative', width: '100%', height: '100%', perspective: '1800px' }}>
+          {images.map((img, i) => {
+            const n = images.length;
+            let offset = ((i - centerIndex) % n + n) % n;
+            if (offset > n / 2) offset -= n;
+            if (Math.abs(offset) > CAROUSEL_VISIBLE_RANGE) return null;
+            const abs = Math.abs(offset);
+            const scale = Math.max(0.5, 1 - abs * 0.2);
+            const opacity = Math.max(0, 1 - abs * 0.35);
+            return (
+              <img
+                key={img.id}
+                src={img.url}
+                alt=""
+                style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  height: '65vh', width: 'auto', maxWidth: '55vw', objectFit: 'contain',
+                  borderRadius: 16, background: '#111',
+                  boxShadow: offset === 0 ? '0 20px 60px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.4)',
+                  transform: `translate(-50%, -50%) translateX(${offset * 24}vw) rotateY(${-offset * 40}deg) scale(${scale})`,
+                  opacity,
+                  zIndex: 100 - abs,
+                  transition: 'transform 0.8s cubic-bezier(.4,0,.2,1), opacity 0.8s ease',
+                }}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -374,10 +387,19 @@ export default function CustomerDisplayPage() {
 
         {/* Fixed disclaimer + payment icons */}
         <div style={{ marginTop: '1.2rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
-          {promoText && (
-            <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-              {promoText}
-            </p>
+          {(promoTextMichelin || promoTextBfGoodrich) && (
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+              {promoTextMichelin && (
+                <p style={{ flex: 1, color: '#374151', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  <strong>Michelin:</strong> {promoTextMichelin}
+                </p>
+              )}
+              {promoTextBfGoodrich && (
+                <p style={{ flex: 1, color: '#374151', fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  <strong>BF Goodrich:</strong> {promoTextBfGoodrich}
+                </p>
+              )}
+            </div>
           )}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1.5rem' }}>
             <ol style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem', color: '#6b7280', lineHeight: 1.8 }}>

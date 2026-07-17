@@ -27,10 +27,11 @@ export class DisplayService {
   async getStaffState(shopId: string, staffId: string) {
     const key = this.staffKey(shopId, staffId);
     const quotationId = this.staffQuotationCache.get(key) ?? null;
-    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoText: true } });
-    const promoText = shop?.promoText ?? null;
+    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoTextMichelin: true, promoTextBfGoodrich: true } });
+    const promoTextMichelin = shop?.promoTextMichelin ?? null;
+    const promoTextBfGoodrich = shop?.promoTextBfGoodrich ?? null;
 
-    if (!quotationId) return { mode: 'slideshow', promoText };
+    if (!quotationId) return { mode: 'slideshow', promoTextMichelin, promoTextBfGoodrich };
 
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: quotationId },
@@ -42,7 +43,7 @@ export class DisplayService {
 
     if (!quotation || quotation.status === 'CONVERTED' || quotation.status === 'CANCELLED') {
       this.staffQuotationCache.delete(key);
-      return { mode: 'slideshow', promoText };
+      return { mode: 'slideshow', promoTextMichelin, promoTextBfGoodrich };
     }
 
     const enrichedItems = await Promise.all(
@@ -52,7 +53,7 @@ export class DisplayService {
       }),
     );
 
-    return { mode: 'quotation', quotation: { ...quotation, items: enrichedItems }, promoText };
+    return { mode: 'quotation', quotation: { ...quotation, items: enrichedItems }, promoTextMichelin, promoTextBfGoodrich };
   }
 
   setStaffQuotation(shopId: string, staffId: string, quotationId: string) {
@@ -166,9 +167,10 @@ export class DisplayService {
 
   async getState(shopId: string) {
     const quotation = await this.getActiveQuotation(shopId);
-    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoText: true } });
-    const promoText = shop?.promoText ?? null;
-    if (quotation) return { mode: 'quotation', quotation, promoText };
+    const shop = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { promoTextMichelin: true, promoTextBfGoodrich: true } });
+    const promoTextMichelin = shop?.promoTextMichelin ?? null;
+    const promoTextBfGoodrich = shop?.promoTextBfGoodrich ?? null;
+    if (quotation) return { mode: 'quotation', quotation, promoTextMichelin, promoTextBfGoodrich };
     return { mode: 'slideshow' };
   }
 

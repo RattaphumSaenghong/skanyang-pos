@@ -16,7 +16,8 @@ model Shop {
   active                   Boolean  @default(true)
   createdAt                DateTime @default(now())
   activeDisplayQuotationId String?
-  promoText                String?
+  promoTextMichelin        String?
+  promoTextBfGoodrich      String?
 
   users          User[]
   stockItems     StockItem[]

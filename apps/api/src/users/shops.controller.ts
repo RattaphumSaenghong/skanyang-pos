@@ -23,7 +23,7 @@ export class ShopsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.OWNER)
-  update(@Param('id') id: string, @Body() body: { name?: string; phone?: string; address?: string; email?: string; promoText?: string }) {
+  update(@Param('id') id: string, @Body() body: { name?: string; phone?: string; address?: string; email?: string; promoTextMichelin?: string; promoTextBfGoodrich?: string }) {
     return this.prisma.shop.update({ where: { id }, data: body });
   }
 

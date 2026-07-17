@@ -69,14 +69,15 @@ export default function UsersSettingsPage() {
 
   // ── Shop / Quotation tab ───────────────────────────────────────────────────
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
-  const [shopForm, setShopForm] = useState<{ name: string; phone: string; address: string; email: string; promoText: string } | null>(null);
+  const [shopForm, setShopForm] = useState<{ name: string; phone: string; address: string; email: string; promoTextMichelin: string; promoTextBfGoodrich: string } | null>(null);
   const [promoShopId, setPromoShopId] = useState('');
-  const [promoText, setPromoText] = useState('');
+  const [promoTextMichelin, setPromoTextMichelin] = useState('');
+  const [promoTextBfGoodrich, setPromoTextBfGoodrich] = useState('');
   const [promoSuccess, setPromoSuccess] = useState(false);
 
   const editShop = (s: any) => {
     setEditingShopId(s.id);
-    setShopForm({ name: s.name ?? '', phone: s.phone ?? '', address: s.address ?? '', email: s.email ?? '', promoText: s.promoText ?? '' });
+    setShopForm({ name: s.name ?? '', phone: s.phone ?? '', address: s.address ?? '', email: s.email ?? '', promoTextMichelin: s.promoTextMichelin ?? '', promoTextBfGoodrich: s.promoTextBfGoodrich ?? '' });
   };
 
   const saveShop = useMutation({
@@ -85,15 +86,16 @@ export default function UsersSettingsPage() {
   });
 
   const savePromo = useMutation({
-    mutationFn: () => api.patch(`/shops/${promoShopId}`, { promoText }),
+    mutationFn: () => api.patch(`/shops/${promoShopId}`, { promoTextMichelin, promoTextBfGoodrich }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shops'] }); setPromoSuccess(true); setTimeout(() => setPromoSuccess(false), 3000); },
   });
 
-  // sync promoText textarea when shop is selected
+  // sync promo textareas when shop is selected
   const handlePromoShopChange = (id: string) => {
     setPromoShopId(id);
     const s = shops.find((s: any) => s.id === id);
-    setPromoText(s?.promoText ?? '');
+    setPromoTextMichelin(s?.promoTextMichelin ?? '');
+    setPromoTextBfGoodrich(s?.promoTextBfGoodrich ?? '');
   };
 
   const TABS: { key: Tab; label: string }[] = [
@@ -408,13 +410,28 @@ export default function UsersSettingsPage() {
             </div>
             {promoShopId && (
               <>
-                <textarea
-                  className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                  rows={4}
-                  placeholder="เช่น โปรโมชั่นเดือนมิถุนายน: ซื้อยาง 4 เส้น แถมบริการถ่วงล้อฟรี..."
-                  value={promoText}
-                  onChange={(e) => setPromoText(e.target.value)}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Michelin</label>
+                    <textarea
+                      className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+                      rows={4}
+                      placeholder="เช่น โปรโมชั่นเดือนมิถุนายน: ซื้อยาง 4 เส้น แถมบริการถ่วงล้อฟรี..."
+                      value={promoTextMichelin}
+                      onChange={(e) => setPromoTextMichelin(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">BF Goodrich</label>
+                    <textarea
+                      className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+                      rows={4}
+                      placeholder="เช่น โปรโมชั่นเดือนมิถุนายน: ซื้อยาง 4 เส้น แถมบริการถ่วงล้อฟรี..."
+                      value={promoTextBfGoodrich}
+                      onChange={(e) => setPromoTextBfGoodrich(e.target.value)}
+                    />
+                  </div>
+                </div>
                 {promoSuccess && <p className="text-sm text-green-600 font-medium">บันทึกแล้ว ✓</p>}
                 <button
                   onClick={() => savePromo.mutate()}

@@ -88,7 +88,12 @@ export default function QuotationPage() {
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const [plateNumber, setPlateNumber] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notesMichelin, setNotesMichelin] = useState('');
+  const [notesBfGoodrich, setNotesBfGoodrich] = useState('');
+  const notes = [
+    notesMichelin && `Michelin: ${notesMichelin}`,
+    notesBfGoodrich && `BF Goodrich: ${notesBfGoodrich}`,
+  ].filter(Boolean).join('\n');
   const [email, setEmail] = useState('');
   const [displayToast, setDisplayToast] = useState(false);
   const [emailToast, setEmailToast] = useState(false);
@@ -235,7 +240,7 @@ export default function QuotationPage() {
             <span style={{ color: '#374151' }}>วันที่: <strong style={{ color: '#111' }}>{new Date(quotation.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</strong></span>
             {plateNumber && <span style={{ color: '#374151' }}>ทะเบียน: <strong style={{ color: '#111' }}>{plateNumber}</strong></span>}
           </div>
-          {notes && <p style={{ fontSize: '0.8rem', color: '#374151', marginTop: 4 }}>หมายเหตุ: {notes}</p>}
+          {notes && <p style={{ fontSize: '0.8rem', color: '#374151', marginTop: 4, whiteSpace: 'pre-wrap' }}>{notes}</p>}
         </div>
 
         {/* Table */}
@@ -305,10 +310,19 @@ export default function QuotationPage() {
 
         {/* Footer */}
         <div style={{ marginTop: '1rem', borderTop: '2px solid #9ca3af', paddingTop: '0.85rem' }}>
-          {shop?.promoText && (
-            <p style={{ fontSize: '0.8rem', color: '#111', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #9ca3af', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-              {shop.promoText}
-            </p>
+          {(shop?.promoTextMichelin || shop?.promoTextBfGoodrich) && (
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #9ca3af' }}>
+              {shop?.promoTextMichelin && (
+                <p style={{ flex: 1, fontSize: '0.8rem', color: '#111', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  <strong>Michelin:</strong> {shop.promoTextMichelin}
+                </p>
+              )}
+              {shop?.promoTextBfGoodrich && (
+                <p style={{ flex: 1, fontSize: '0.8rem', color: '#111', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  <strong>BF Goodrich:</strong> {shop.promoTextBfGoodrich}
+                </p>
+              )}
+            </div>
           )}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
             <ol style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.72rem', color: '#374151', lineHeight: 1.9 }}>
@@ -371,7 +385,7 @@ export default function QuotationPage() {
       </div>
 
       {/* Plate + Notes + Email */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <div>
           <label className="block text-sm font-medium mb-1">ทะเบียนรถ</label>
           <input
@@ -382,11 +396,19 @@ export default function QuotationPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">หมายเหตุ</label>
+          <label className="block text-sm font-medium mb-1">หมายเหตุ (Michelin)</label>
           <input
             className="w-full border rounded-lg px-3 py-2 text-sm"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            value={notesMichelin}
+            onChange={(e) => setNotesMichelin(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">หมายเหตุ (BF Goodrich)</label>
+          <input
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+            value={notesBfGoodrich}
+            onChange={(e) => setNotesBfGoodrich(e.target.value)}
           />
         </div>
         <div>
@@ -556,10 +578,19 @@ export default function QuotationPage() {
 
       {/* Fixed disclaimer + promo text + payment icons */}
       <div className="bg-white rounded-xl border px-5 py-4 mb-4">
-        {shop?.promoText && (
-          <p className="text-xs text-gray-700 mb-3 pb-3 border-b whitespace-pre-wrap leading-relaxed">
-            {shop.promoText}
-          </p>
+        {(shop?.promoTextMichelin || shop?.promoTextBfGoodrich) && (
+          <div className="flex gap-6 mb-3 pb-3 border-b">
+            {shop?.promoTextMichelin && (
+              <p className="flex-1 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <strong>Michelin:</strong> {shop.promoTextMichelin}
+              </p>
+            )}
+            {shop?.promoTextBfGoodrich && (
+              <p className="flex-1 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <strong>BF Goodrich:</strong> {shop.promoTextBfGoodrich}
+              </p>
+            )}
+          </div>
         )}
         <div className="flex items-start justify-between gap-4 mt-3 pt-3 border-t">
           <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
