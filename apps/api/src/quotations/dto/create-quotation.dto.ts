@@ -32,6 +32,10 @@ export class CreateQuotationDto {
 
   @IsString()
   @IsOptional()
+  shopId?: string;
+
+  @IsString()
+  @IsOptional()
   customerId?: string;
 
   @IsString()

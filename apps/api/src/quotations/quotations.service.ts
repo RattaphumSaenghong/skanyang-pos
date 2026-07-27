@@ -16,25 +16,25 @@ export class QuotationsService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateQuotationDto, userId: string, shopId: string | null) {
-    // OWNER has shopId=null — fall back to first shop that has an active price list
-    let effectiveShopId = shopId;
-    let activePL;
-    if (effectiveShopId) {
-      activePL = await this.prisma.priceList.findFirst({ where: { shopId: effectiveShopId, isActive: true } });
-    } else {
-      activePL = await this.prisma.priceList.findFirst({ where: { isActive: true } });
-      if (activePL) effectiveShopId = activePL.shopId;
-    }
-    if (!activePL || !effectiveShopId) throw new ForbiddenException('No active price list');
+    if (!shopId) throw new BadRequestException('Shop is required');
 
+    const activePL = await this.prisma.priceList.findFirst({
+      where: { shopId, isActive: true },
+    });
+    if (!activePL) throw new ForbiddenException('No active price list');
+
+    const priceEntryIds = [...new Set(dto.items.map((i) => i.priceEntryId))];
     const entries = await this.prisma.priceEntry.findMany({
-      where: { id: { in: dto.items.map((i) => i.priceEntryId) } },
+      where: { id: { in: priceEntryIds }, priceListId: activePL.id },
       include: { product: true },
     });
+    if (entries.length !== priceEntryIds.length) {
+      throw new BadRequestException('One or more price entries are unavailable for this shop');
+    }
 
     const quotation = await this.prisma.quotation.create({
       data: {
-        shopId: effectiveShopId,
+        shopId,
         priceListId: activePL.id,
         createdById: userId,
         customerId: dto.customerId ?? null,

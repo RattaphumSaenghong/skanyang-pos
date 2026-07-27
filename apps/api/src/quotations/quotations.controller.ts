@@ -17,7 +17,7 @@ export class QuotationsController {
 
   @Post()
   create(@Body() body: CreateQuotationDto, @CurrentUser() user: any) {
-    const shopId = user.role === 'OWNER' ? ((body as any).shopId ?? user.shopId) : user.shopId;
+    const shopId = user.role === 'OWNER' ? (body.shopId ?? user.shopId) : user.shopId;
     return this.service.create(body, user.id, shopId);
   }
 
