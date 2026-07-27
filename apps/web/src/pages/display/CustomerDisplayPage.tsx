@@ -15,7 +15,7 @@ interface QuotationItem {
   discCard: number;
   discCash: number;
   discPromo: number;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; imageUrl: string | null };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null; imageUrl: string | null };
 }
 
 interface ActiveQuotation {
@@ -27,10 +27,19 @@ interface ActiveQuotation {
 
 interface SearchEntry {
   id: string;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null };
   priceCash: number;
   priceCard: number;
   priceZeroPct: number;
+}
+
+interface Snapshot {
+  mode: string;
+  quotation?: ActiveQuotation | null;
+  promoTextMichelin?: string | null;
+  promoTextBfGoodrich?: string | null;
+  searchResults?: SearchEntry[] | null;
+  images?: DisplayImage[];
 }
 
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
@@ -102,24 +111,9 @@ export default function CustomerDisplayPage() {
   const [shopInfo, setShopInfo] = useState<{ name: string; phone?: string; address?: string } | null>(null);
   const [centerIndex, setCenterIndex] = useState(0);
 
-  const stateUrl = staffId
-    ? `/api/display/${shopId}/${staffId}/state`
-    : `/api/display/${shopId}/state`;
-  const searchUrl = staffId
-    ? `/api/display/${shopId}/${staffId}/search-results`
-    : `/api/display/${shopId}/search-results`;
-
-  // Poll images every 8s
-  useEffect(() => {
-    const go = () =>
-      fetch(`/api/display/${shopId}/images`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: DisplayImage[] | null) => { if (d !== null) setImages(Array.isArray(d) ? d : []); })
-        .catch(() => {});
-    go();
-    const t = setInterval(go, 8000);
-    return () => clearInterval(t);
-  }, [shopId]);
+  const snapshotUrl = staffId
+    ? `/api/display/${shopId}/${staffId}/snapshot`
+    : `/api/display/${shopId}/snapshot`;
 
   // Fetch shop info once on mount
   useEffect(() => {
@@ -129,35 +123,24 @@ export default function CustomerDisplayPage() {
       .catch(() => {});
   }, [shopId]);
 
-  // Poll display state every 3s — switches between slideshow and quotation view
+  // Poll the whole display state every 3s — one request drives all three layers
   useEffect(() => {
     const go = () =>
-      fetch(stateUrl)
+      fetch(snapshotUrl)
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: { mode: string; quotation?: ActiveQuotation; promoTextMichelin?: string | null; promoTextBfGoodrich?: string | null } | null) => {
-          if (d !== null) {
-            setQuotation(d?.mode === 'quotation' ? (d.quotation ?? null) : null);
-            setPromoTextMichelin(d?.promoTextMichelin ?? null);
-            setPromoTextBfGoodrich(d?.promoTextBfGoodrich ?? null);
-          }
+        .then((d: Snapshot | null) => {
+          if (d === null) return;
+          setImages(Array.isArray(d.images) ? d.images : []);
+          setQuotation(d.mode === 'quotation' ? (d.quotation ?? null) : null);
+          setPromoTextMichelin(d.promoTextMichelin ?? null);
+          setPromoTextBfGoodrich(d.promoTextBfGoodrich ?? null);
+          setSearchEntries(d.searchResults ?? null);
         })
         .catch(() => {});
     go();
     const t = setInterval(go, 3000);
     return () => clearInterval(t);
-  }, [stateUrl]);
-
-  // Poll search results every 3s (shown when no active quotation)
-  useEffect(() => {
-    const go = () =>
-      fetch(searchUrl)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: { results: SearchEntry[] | null } | null) => { if (d !== null) setSearchEntries(d?.results ?? null); })
-        .catch(() => {});
-    go();
-    const t = setInterval(go, 3000);
-    return () => clearInterval(t);
-  }, [searchUrl]);
+  }, [snapshotUrl]);
 
   // Reset to first slide whenever the image set changes
   useEffect(() => {

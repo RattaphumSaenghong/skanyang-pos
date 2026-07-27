@@ -54,6 +54,17 @@ export class DisplayController {
     return Promise.all(files.map((f) => this.service.uploadImage(shopId, f)));
   }
 
+  // Single poll for the customer display — replaces separate state/search-results/images calls
+  @Get(':shopId/snapshot')
+  getSnapshot(@Param('shopId') shopId: string) {
+    return this.service.getSnapshot(shopId);
+  }
+
+  @Get(':shopId/:staffId/snapshot')
+  getStaffSnapshot(@Param('shopId') shopId: string, @Param('staffId') staffId: string) {
+    return this.service.getSnapshot(shopId, staffId);
+  }
+
   @Get(':shopId/state')
   getState(@Param('shopId') shopId: string) {
     return this.service.getState(shopId);

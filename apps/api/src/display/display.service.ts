@@ -20,8 +20,69 @@ export class DisplayService {
   private staffQuotationCache = new Map<string, string | null>();
   private staffSearchCache = new Map<string, any[] | null>();
 
+  // Images change rarely — cached so the snapshot poll doesn't hit the DB for them every time
+  private imagesCache = new Map<string, any[]>();
+
   private staffKey(shopId: string, staffId: string) {
     return `${shopId}:${staffId}`;
+  }
+
+  // One batched lookup — priceEntryId is a plain FK, not a Prisma relation, so it can't be included
+  private async enrichItems(items: any[]) {
+    const ids = [...new Set(items.map((i) => i.priceEntryId))];
+    const entries = await this.prisma.priceEntry.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, priceListed: true, discTradeIn: true, discCard: true, discCash: true, discPromo: true },
+    });
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    return items.map((item) => {
+      const pe = byId.get(item.priceEntryId);
+      return {
+        ...item,
+        priceListed: pe?.priceListed ?? 0,
+        discTradeIn: pe?.discTradeIn ?? 0,
+        discCard: pe?.discCard ?? 0,
+        discCash: pe?.discCash ?? 0,
+        discPromo: pe?.discPromo ?? 0,
+      };
+    });
+  }
+
+  // Everything the customer display needs, in one round trip
+  async getSnapshot(shopId: string, staffId?: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { promoTextMichelin: true, promoTextBfGoodrich: true, activeDisplayQuotationId: true },
+    });
+
+    const base = {
+      promoTextMichelin: shop?.promoTextMichelin ?? null,
+      promoTextBfGoodrich: shop?.promoTextBfGoodrich ?? null,
+      images: await this.getImages(shopId),
+      searchResults: staffId ? this.getStaffSearchResults(shopId, staffId) : this.getSearchResults(shopId),
+    };
+
+    const quotationId = staffId
+      ? this.staffQuotationCache.get(this.staffKey(shopId, staffId)) ?? null
+      : shop?.activeDisplayQuotationId ?? null;
+
+    if (!quotationId) return { mode: 'slideshow', quotation: null, ...base };
+
+    const quotation = await this.prisma.quotation.findUnique({
+      where: { id: quotationId },
+      include: {
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, dotYear: true, imageUrl: true } } } },
+        customer: { select: { name: true } },
+      },
+    });
+
+    if (!quotation || quotation.status === 'CONVERTED' || quotation.status === 'CANCELLED') {
+      if (staffId) this.staffQuotationCache.delete(this.staffKey(shopId, staffId));
+      else await this.prisma.shop.update({ where: { id: shopId }, data: { activeDisplayQuotationId: null } });
+      return { mode: 'slideshow', quotation: null, ...base };
+    }
+
+    return { mode: 'quotation', quotation: { ...quotation, items: await this.enrichItems(quotation.items) }, ...base };
   }
 
   async getStaffState(shopId: string, staffId: string) {
@@ -36,7 +97,7 @@ export class DisplayService {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: quotationId },
       include: {
-        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, imageUrl: true } } } },
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, dotYear: true, imageUrl: true } } } },
         customer: { select: { name: true } },
       },
     });
@@ -46,12 +107,7 @@ export class DisplayService {
       return { mode: 'slideshow', promoTextMichelin, promoTextBfGoodrich };
     }
 
-    const enrichedItems = await Promise.all(
-      quotation.items.map(async (item) => {
-        const pe = await this.prisma.priceEntry.findUnique({ where: { id: item.priceEntryId } });
-        return { ...item, priceListed: pe?.priceListed ?? 0, discTradeIn: pe?.discTradeIn ?? 0, discCard: pe?.discCard ?? 0, discCash: pe?.discCash ?? 0, discPromo: pe?.discPromo ?? 0 };
-      }),
-    );
+    const enrichedItems = await this.enrichItems(quotation.items);
 
     return { mode: 'quotation', quotation: { ...quotation, items: enrichedItems }, promoTextMichelin, promoTextBfGoodrich };
   }
@@ -88,22 +144,30 @@ export class DisplayService {
     if (error) throw new BadRequestException(`Upload failed: ${error.message}`);
 
     const { data } = supabase.storage.from('display-images').getPublicUrl(path);
-    return this.prisma.displayImage.create({
+    const created = await this.prisma.displayImage.create({
       data: { shopId, url: data.publicUrl },
     });
+    this.imagesCache.delete(shopId);
+    return created;
   }
 
-  getImages(shopId: string) {
-    return this.prisma.displayImage.findMany({
+  async getImages(shopId: string) {
+    const cached = this.imagesCache.get(shopId);
+    if (cached) return cached;
+    const images = await this.prisma.displayImage.findMany({
       where: { shopId, active: true },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
+    this.imagesCache.set(shopId, images);
+    return images;
   }
 
   async deleteImage(id: string, shopId: string) {
     const image = await this.prisma.displayImage.findFirst({ where: { id, shopId } });
     if (!image) throw new NotFoundException('ไม่พบรูปภาพ');
-    return this.prisma.displayImage.update({ where: { id }, data: { active: false } });
+    const updated = await this.prisma.displayImage.update({ where: { id }, data: { active: false } });
+    this.imagesCache.delete(shopId);
+    return updated;
   }
 
   async setActiveQuotation(shopId: string, quotationId: string) {
@@ -124,7 +188,7 @@ export class DisplayService {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: shop.activeDisplayQuotationId },
       include: {
-        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, imageUrl: true } } } },
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, dotYear: true, imageUrl: true } } } },
         customer: { select: { name: true } },
       },
     });
@@ -140,19 +204,7 @@ export class DisplayService {
     }
 
     // Enrich items with discount fields from their price entries (same as QuotationsService.findOne)
-    const enrichedItems = await Promise.all(
-      quotation.items.map(async (item) => {
-        const pe = await this.prisma.priceEntry.findUnique({ where: { id: item.priceEntryId } });
-        return {
-          ...item,
-          priceListed: pe?.priceListed ?? 0,
-          discTradeIn: pe?.discTradeIn ?? 0,
-          discCard: pe?.discCard ?? 0,
-          discCash: pe?.discCash ?? 0,
-          discPromo: pe?.discPromo ?? 0,
-        };
-      }),
-    );
+    const enrichedItems = await this.enrichItems(quotation.items);
 
     return { ...quotation, items: enrichedItems };
   }
