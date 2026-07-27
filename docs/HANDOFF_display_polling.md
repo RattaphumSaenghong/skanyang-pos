@@ -271,6 +271,17 @@ Three commits ship together and **two of them require a migration**. Order matte
    ```
    npx prisma migrate deploy
    ```
+   > **Already done on production on 2026-07-27** — both applied and verified
+   > (2,342 items backfilled, 0 disagreeing with their `PriceEntry`, tokens issued
+   > for both shops). This step remains here for any other environment.
+   >
+   > Two gotchas if you run it elsewhere:
+   > - `DATABASE_URL` points at Supabase's **transaction pooler** (port 6543), which
+   >   Prisma Migrate cannot use — it hangs with no output. Run migrations against
+   >   the **session pooler** (same host, port 5432).
+   > - Production had drifted: `20260617000000_float_size_width_rim` had been applied
+   >   by hand and never recorded, so it showed as pending. It was reconciled with
+   >   `prisma migrate resolve --applied` rather than re-run.
    - `20260727120000_snapshot_item_prices_and_quotation_updated_at` — adds the price
      snapshot columns to `QuotationItem` (backfilling every item whose `PriceEntry`
      still exists) and `Quotation.updatedAt` (seeded from `createdAt`).
