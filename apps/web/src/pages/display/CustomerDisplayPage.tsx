@@ -40,6 +40,7 @@ interface Snapshot {
   promoTextBfGoodrich?: string | null;
   searchResults?: SearchEntry[] | null;
   images?: DisplayImage[];
+  shopInfo?: { name: string; phone?: string | null; address?: string | null } | null;
 }
 
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
@@ -121,14 +122,6 @@ export default function CustomerDisplayPage() {
     ? `/api/display/${shopId}/${staffId}/snapshot`
     : `/api/display/${shopId}/snapshot`;
 
-  // Fetch shop info once on mount
-  useEffect(() => {
-    fetch(`/api/shops/${shopId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) setShopInfo({ name: d.name, phone: d.phone, address: d.address }); })
-      .catch(() => {});
-  }, [shopId]);
-
   // Poll the whole display state every 3s — one request drives all three layers
   useEffect(() => {
     const go = () =>
@@ -141,6 +134,13 @@ export default function CustomerDisplayPage() {
           setPromoTextMichelin(d.promoTextMichelin ?? null);
           setPromoTextBfGoodrich(d.promoTextBfGoodrich ?? null);
           setSearchEntries(d.searchResults ?? null);
+          if (d.shopInfo) {
+            setShopInfo({
+              name: d.shopInfo.name,
+              phone: d.shopInfo.phone ?? undefined,
+              address: d.shopInfo.address ?? undefined,
+            });
+          }
         })
         .catch(() => {});
     go();

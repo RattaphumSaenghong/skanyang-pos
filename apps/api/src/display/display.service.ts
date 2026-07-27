@@ -31,12 +31,19 @@ export class DisplayService {
   async getSnapshot(shopId: string, staffId?: string) {
     const shop = await this.prisma.shop.findUnique({
       where: { id: shopId },
-      select: { promoTextMichelin: true, promoTextBfGoodrich: true, activeDisplayQuotationId: true },
+      select: {
+        promoTextMichelin: true, promoTextBfGoodrich: true, activeDisplayQuotationId: true,
+        name: true, phone: true, address: true,
+      },
     });
 
     const base = {
       promoTextMichelin: shop?.promoTextMichelin ?? null,
       promoTextBfGoodrich: shop?.promoTextBfGoodrich ?? null,
+      // Carried here because the display cannot call GET /shops/:id — that route
+      // is behind JwtAuthGuard and the screen has no login. This row is already
+      // being read, so it costs nothing.
+      shopInfo: shop ? { name: shop.name, phone: shop.phone, address: shop.address } : null,
       images: await this.getImages(shopId),
       searchResults: staffId ? this.getStaffSearchResults(shopId, staffId) : this.getSearchResults(shopId),
     };
