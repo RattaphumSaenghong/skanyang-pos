@@ -119,8 +119,13 @@ export class QuotationsService {
     const updated = await this.prisma.quotationItem.update({ where: { id: itemId }, data });
     // Editing an item is activity on the quotation, but writing to QuotationItem
     // does not touch Quotation.updatedAt — bump it so the stale-draft cleanup
-    // does not cancel a quote that is actively being worked on
-    await this.prisma.quotation.update({ where: { id: quotationId }, data: {} });
+    // does not cancel a quote that is actively being worked on.
+    // Set the timestamp explicitly: Prisma does not apply @updatedAt when `data`
+    // is empty, so `data: {}` here would silently do nothing.
+    await this.prisma.quotation.update({
+      where: { id: quotationId },
+      data: { updatedAt: new Date() },
+    });
     return updated;
   }
 
