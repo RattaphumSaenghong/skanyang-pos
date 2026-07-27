@@ -128,6 +128,15 @@ export class DisplayService {
     return created;
   }
 
+  async getDisplayToken(shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { displayToken: true },
+    });
+    if (!shop) throw new NotFoundException('ไม่พบร้าน');
+    return { displayToken: shop.displayToken };
+  }
+
   async getImages(shopId: string) {
     const cached = this.imagesCache.get(shopId);
     if (cached) return cached;

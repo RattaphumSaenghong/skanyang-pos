@@ -18,6 +18,10 @@ model Shop {
   activeDisplayQuotationId String?
   promoTextMichelin        String?
   promoTextBfGoodrich      String?
+  // Unguessable per-shop secret for the customer display screens. They are
+  // legitimately unauthenticated (no one logs in on a customer monitor), but
+  // shop ids are guessable, so the token is what scopes access to the shop.
+  displayToken             String   @unique @default(uuid())
 
   users          User[]
   stockItems     StockItem[]

@@ -43,7 +43,10 @@ export default function Layout() {
 
   const handleOpenDisplay = async () => {
     const shopId = user?.shopId ?? shops[0]?.id;
-    if (shopId && user?.id) window.open(`/display/${shopId}/${user.id}`, '_blank');
+    if (!shopId || !user?.id) return;
+    // The display screen has no login, so it carries the shop's display token
+    const { data } = await api.get(`/display/${shopId}/token`);
+    window.open(`/display/${shopId}/${user.id}?t=${encodeURIComponent(data.displayToken)}`, '_blank');
   };
 
   const selectedShop = shops.find((s) => s.id === user?.shopId);

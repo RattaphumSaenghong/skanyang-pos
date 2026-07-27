@@ -111,6 +111,12 @@ export default function CustomerDisplayPage() {
   const [shopInfo, setShopInfo] = useState<{ name: string; phone?: string; address?: string } | null>(null);
   const [centerIndex, setCenterIndex] = useState(0);
 
+  // This screen has no login — the shop's display token authorises it. It arrives
+  // once in the URL, then travels as a header so it stays out of access logs on
+  // every 3s poll.
+  const displayToken = new URLSearchParams(window.location.search).get('t') ?? '';
+  const authHeaders = { 'x-display-token': displayToken };
+
   const snapshotUrl = staffId
     ? `/api/display/${shopId}/${staffId}/snapshot`
     : `/api/display/${shopId}/snapshot`;
@@ -126,7 +132,7 @@ export default function CustomerDisplayPage() {
   // Poll the whole display state every 3s — one request drives all three layers
   useEffect(() => {
     const go = () =>
-      fetch(snapshotUrl)
+      fetch(snapshotUrl, { headers: authHeaders })
         .then((r) => (r.ok ? r.json() : null))
         .then((d: Snapshot | null) => {
           if (d === null) return;
@@ -248,7 +254,7 @@ export default function CustomerDisplayPage() {
     : `/api/display/${shopId}/active-quotation/dismiss`;
 
   function handleDismiss() {
-    fetch(dismissUrl, { method: 'DELETE' }).catch(() => {});
+    fetch(dismissUrl, { method: 'DELETE', headers: authHeaders }).catch(() => {});
     setQuotation(null);
   }
 

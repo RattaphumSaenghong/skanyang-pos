@@ -263,6 +263,43 @@ The non-staff shape is still live and used when a display is opened without a st
 - **`enrichItems()` is on the money path.** It feeds the prices a customer reads before agreeing to
   buy. Test 4 is not optional.
 
+## Deploy sequence
+
+Three commits ship together and **two of them require a migration**. Order matters.
+
+1. **Apply the migrations first, before the new API is live.**
+   ```
+   npx prisma migrate deploy
+   ```
+   - `20260727120000_snapshot_item_prices_and_quotation_updated_at` — adds the price
+     snapshot columns to `QuotationItem` (backfilling every item whose `PriceEntry`
+     still exists) and `Quotation.updatedAt` (seeded from `createdAt`).
+   - `20260727130000_add_shop_display_token` — adds `Shop.displayToken`, backfilled
+     with `gen_random_uuid()`.
+
+   Both are additive with defaults, so the currently-deployed API keeps working
+   against the migrated schema. Apply them while the shop is closed.
+
+2. **Deploy the API and web bundle.**
+
+3. **Re-open every customer display screen from the POS.** This is now required for
+   two reasons at once, and one action covers both:
+   - old tabs keep polling `/state`, `/search-results` and `/images`, so the request
+     drop does not materialise until they reload;
+   - display URLs now carry `?t=<shop display token>`, and an old URL without one
+     gets a 401.
+
+   Staff do this by clicking **จอลูกค้า** in the POS, which fetches the token and
+   opens the tokenised URL. No one has to type a URL by hand. Any screen left on an
+   old URL will show nothing until it is re-opened this way.
+
+### Rollback
+
+The migrations are additive, so the previous API build runs fine against the new
+schema — rolling back the deploy needs no DB change. Do not roll the migrations
+back: dropping `QuotationItem.priceListed` and friends would discard the snapshotted
+prices, and they cannot be rebuilt for items whose `PriceEntry` is already gone.
+
 ## Found while testing — pre-existing, not caused by this change
 
 **179 quotation items reference `priceEntry` rows that no longer exist** (deleted by price-list
@@ -272,15 +309,27 @@ affected quotations are still in `SENT` status, so they *can* still be put on a 
 would show ฿0 prices. Worth tracking separately: either block deletion of a `priceEntry` still
 referenced by a quotation item, or snapshot the prices onto `QuotationItem` at creation time.
 
-## Deliberately out of scope
+## Previously out of scope — now fixed
 
-Agreed during planning, tracked separately:
-- **Display GET endpoints have no auth.** Anyone who knows a `shopId` can poll them, and
-  `DELETE .../dismiss` can clear any shop's display. The right fix is a shop-scoped display token,
-  not `JwtAuthGuard` — the screens are legitimately unauthenticated.
-- **`ThrottlerModule` is registered in `app.module.ts` but never wired as an `APP_GUARD`**, so it
-  only applies to the login route. Its current config (`ttl 60000 / limit 5`) is far too strict to
-  make global without per-route overrides.
+- **Display GET endpoints had no auth.** Anyone who knew a `shopId` (they are guessable —
+  `shop-1`) could poll live quotation data, and `DELETE .../dismiss` could clear a shop's
+  display. These routes are also explicitly excluded from `IpWhitelistMiddleware`
+  (`app.module.ts:44`), which is what left them publicly reachable.
+
+  Fixed with a shop-scoped `Shop.displayToken` rather than `JwtAuthGuard`, since nobody logs
+  in on a customer monitor. `DisplayAccessGuard` accepts **either** a valid display token
+  (`?t=` or `x-display-token`) **or** a normal JWT — the second branch is what keeps the
+  authenticated admin banner UI working, as it shares `GET :shopId/images` with the display.
+  The guard caches tokens for 5 minutes so a 3s poll does not add a DB read per request.
+
+- **`ThrottlerModule` was registered but never wired as an `APP_GUARD`**, so it only covered
+  login. Now global. Two things to know about the config:
+  - The global limit is deliberately generous (600/min). A whole shop shares one public IP,
+    and each display screen alone is 20 req/min. The old `limit: 5` would have locked the
+    shop out instantly if made global; login keeps that strict limit via a per-route override.
+  - `trust proxy` is not set on the Express app, so `req.ip` is the proxy's. The throttler
+    derives the real client from `x-forwarded-for`, the same way `auth.controller` already
+    does. If `trust proxy` is ever turned on, revisit that tracker.
 
 ## Possible follow-up
 
