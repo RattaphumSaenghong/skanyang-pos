@@ -53,6 +53,11 @@ export class QuotationsService {
               unitPriceCash: entry.priceCash,
               unitPriceCard: entry.priceCard,
               unitPriceZeroPct: entry.priceZeroPct,
+              priceListed: entry.priceListed,
+              discTradeIn: entry.discTradeIn,
+              discCard: entry.discCard,
+              discCash: entry.discCash,
+              discPromo: entry.discPromo,
             };
           }),
         },
@@ -77,21 +82,9 @@ export class QuotationsService {
     });
     if (!q) throw new NotFoundException('Quotation not found');
     if (role !== 'OWNER' && shopId && q.shopId !== shopId) throw new ForbiddenException('Access denied');
-    // Enrich each item with its priceEntry discount fields
-    const enrichedItems = await Promise.all(
-      q.items.map(async (item) => {
-        const pe = await this.prisma.priceEntry.findUnique({ where: { id: item.priceEntryId } });
-        return {
-          ...item,
-          priceListed: pe?.priceListed ?? 0,
-          discTradeIn: pe?.discTradeIn ?? 0,
-          discCard: pe?.discCard ?? 0,
-          discCash: pe?.discCash ?? 0,
-          discPromo: pe?.discPromo ?? 0,
-        };
-      }),
-    );
-    return { ...q, items: enrichedItems };
+    // Prices live on the item itself — no PriceEntry lookup, so a re-imported
+    // price list can no longer blank out an existing quotation
+    return q;
   }
 
   async update(id: string, dto: UpdateQuotationDto, shopId?: string | null, role?: string) {
@@ -123,7 +116,17 @@ export class QuotationsService {
     const data: { qty?: number; isIndividual?: boolean } = {};
     if (dto.qty !== undefined) data.qty = dto.qty;
     if (dto.isIndividual !== undefined) data.isIndividual = dto.isIndividual;
-    return this.prisma.quotationItem.update({ where: { id: itemId }, data });
+    const updated = await this.prisma.quotationItem.update({ where: { id: itemId }, data });
+    // Editing an item is activity on the quotation, but writing to QuotationItem
+    // does not touch Quotation.updatedAt — bump it so the stale-draft cleanup
+    // does not cancel a quote that is actively being worked on.
+    // Set the timestamp explicitly: Prisma does not apply @updatedAt when `data`
+    // is empty, so `data: {}` here would silently do nothing.
+    await this.prisma.quotation.update({
+      where: { id: quotationId },
+      data: { updatedAt: new Date() },
+    });
+    return updated;
   }
 
   findByShop(shopId: string) {
@@ -139,7 +142,7 @@ export class QuotationsService {
   async cleanupAllStaleDrafts() {
     const cutoff = new Date(Date.now() - 5 * 60 * 1000);
     const stale = await this.prisma.quotation.findMany({
-      where: { status: 'DRAFT', createdAt: { lt: cutoff } },
+      where: { status: 'DRAFT', updatedAt: { lt: cutoff } },
       select: { id: true, shopId: true },
     });
     if (stale.length === 0) return;
@@ -157,7 +160,7 @@ export class QuotationsService {
   async cleanupStaleDrafts(shopId: string) {
     const cutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 min ago
     const stale = await this.prisma.quotation.findMany({
-      where: { shopId, status: 'DRAFT', createdAt: { lt: cutoff } },
+      where: { shopId, status: 'DRAFT', updatedAt: { lt: cutoff } },
       select: { id: true },
     });
     if (stale.length === 0) return { cancelled: 0 };

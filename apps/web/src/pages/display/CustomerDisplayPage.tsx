@@ -15,7 +15,7 @@ interface QuotationItem {
   discCard: number;
   discCash: number;
   discPromo: number;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; imageUrl: string | null };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null; imageUrl: string | null };
 }
 
 interface ActiveQuotation {
@@ -27,10 +27,20 @@ interface ActiveQuotation {
 
 interface SearchEntry {
   id: string;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean };
+  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null };
   priceCash: number;
   priceCard: number;
   priceZeroPct: number;
+}
+
+interface Snapshot {
+  mode: string;
+  quotation?: ActiveQuotation | null;
+  promoTextMichelin?: string | null;
+  promoTextBfGoodrich?: string | null;
+  searchResults?: SearchEntry[] | null;
+  images?: DisplayImage[];
+  shopInfo?: { name: string; phone?: string | null; address?: string | null } | null;
 }
 
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
@@ -102,62 +112,41 @@ export default function CustomerDisplayPage() {
   const [shopInfo, setShopInfo] = useState<{ name: string; phone?: string; address?: string } | null>(null);
   const [centerIndex, setCenterIndex] = useState(0);
 
-  const stateUrl = staffId
-    ? `/api/display/${shopId}/${staffId}/state`
-    : `/api/display/${shopId}/state`;
-  const searchUrl = staffId
-    ? `/api/display/${shopId}/${staffId}/search-results`
-    : `/api/display/${shopId}/search-results`;
+  // This screen has no login — the shop's display token authorises it. It arrives
+  // once in the URL, then travels as a header so it stays out of access logs on
+  // every 3s poll.
+  const displayToken = new URLSearchParams(window.location.search).get('t') ?? '';
+  const authHeaders = { 'x-display-token': displayToken };
 
-  // Poll images every 8s
+  const snapshotUrl = staffId
+    ? `/api/display/${shopId}/${staffId}/snapshot`
+    : `/api/display/${shopId}/snapshot`;
+
+  // Poll the whole display state every 3s — one request drives all three layers
   useEffect(() => {
     const go = () =>
-      fetch(`/api/display/${shopId}/images`)
+      fetch(snapshotUrl, { headers: authHeaders })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: DisplayImage[] | null) => { if (d !== null) setImages(Array.isArray(d) ? d : []); })
-        .catch(() => {});
-    go();
-    const t = setInterval(go, 8000);
-    return () => clearInterval(t);
-  }, [shopId]);
-
-  // Fetch shop info once on mount
-  useEffect(() => {
-    fetch(`/api/shops/${shopId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) setShopInfo({ name: d.name, phone: d.phone, address: d.address }); })
-      .catch(() => {});
-  }, [shopId]);
-
-  // Poll display state every 3s — switches between slideshow and quotation view
-  useEffect(() => {
-    const go = () =>
-      fetch(stateUrl)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: { mode: string; quotation?: ActiveQuotation; promoTextMichelin?: string | null; promoTextBfGoodrich?: string | null } | null) => {
-          if (d !== null) {
-            setQuotation(d?.mode === 'quotation' ? (d.quotation ?? null) : null);
-            setPromoTextMichelin(d?.promoTextMichelin ?? null);
-            setPromoTextBfGoodrich(d?.promoTextBfGoodrich ?? null);
+        .then((d: Snapshot | null) => {
+          if (d === null) return;
+          setImages(Array.isArray(d.images) ? d.images : []);
+          setQuotation(d.mode === 'quotation' ? (d.quotation ?? null) : null);
+          setPromoTextMichelin(d.promoTextMichelin ?? null);
+          setPromoTextBfGoodrich(d.promoTextBfGoodrich ?? null);
+          setSearchEntries(d.searchResults ?? null);
+          if (d.shopInfo) {
+            setShopInfo({
+              name: d.shopInfo.name,
+              phone: d.shopInfo.phone ?? undefined,
+              address: d.shopInfo.address ?? undefined,
+            });
           }
         })
         .catch(() => {});
     go();
     const t = setInterval(go, 3000);
     return () => clearInterval(t);
-  }, [stateUrl]);
-
-  // Poll search results every 3s (shown when no active quotation)
-  useEffect(() => {
-    const go = () =>
-      fetch(searchUrl)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: { results: SearchEntry[] | null } | null) => { if (d !== null) setSearchEntries(d?.results ?? null); })
-        .catch(() => {});
-    go();
-    const t = setInterval(go, 3000);
-    return () => clearInterval(t);
-  }, [searchUrl]);
+  }, [snapshotUrl]);
 
   // Reset to first slide whenever the image set changes
   useEffect(() => {
@@ -265,7 +254,7 @@ export default function CustomerDisplayPage() {
     : `/api/display/${shopId}/active-quotation/dismiss`;
 
   function handleDismiss() {
-    fetch(dismissUrl, { method: 'DELETE' }).catch(() => {});
+    fetch(dismissUrl, { method: 'DELETE', headers: authHeaders }).catch(() => {});
     setQuotation(null);
   }
 

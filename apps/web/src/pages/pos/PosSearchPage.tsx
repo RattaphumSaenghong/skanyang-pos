@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -41,7 +41,8 @@ export default function PosSearchPage() {
     enabled: search.length >= 3,
   });
 
-  const entries: PriceEntry[] = data ?? [];
+  // Memoised so the display-push effect below doesn't refire on every render
+  const entries: PriceEntry[] = useMemo(() => data ?? [], [data]);
 
   const shopId = effectiveShopId;
   const userId = user?.id;
