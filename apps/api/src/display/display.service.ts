@@ -27,27 +27,6 @@ export class DisplayService {
     return `${shopId}:${staffId}`;
   }
 
-  // One batched lookup — priceEntryId is a plain FK, not a Prisma relation, so it can't be included
-  private async enrichItems(items: any[]) {
-    const ids = [...new Set(items.map((i) => i.priceEntryId))];
-    const entries = await this.prisma.priceEntry.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, priceListed: true, discTradeIn: true, discCard: true, discCash: true, discPromo: true },
-    });
-    const byId = new Map(entries.map((e) => [e.id, e]));
-    return items.map((item) => {
-      const pe = byId.get(item.priceEntryId);
-      return {
-        ...item,
-        priceListed: pe?.priceListed ?? 0,
-        discTradeIn: pe?.discTradeIn ?? 0,
-        discCard: pe?.discCard ?? 0,
-        discCash: pe?.discCash ?? 0,
-        discPromo: pe?.discPromo ?? 0,
-      };
-    });
-  }
-
   // Everything the customer display needs, in one round trip
   async getSnapshot(shopId: string, staffId?: string) {
     const shop = await this.prisma.shop.findUnique({
@@ -82,7 +61,7 @@ export class DisplayService {
       return { mode: 'slideshow', quotation: null, ...base };
     }
 
-    return { mode: 'quotation', quotation: { ...quotation, items: await this.enrichItems(quotation.items) }, ...base };
+    return { mode: 'quotation', quotation, ...base };
   }
 
   async getStaffState(shopId: string, staffId: string) {
@@ -107,9 +86,7 @@ export class DisplayService {
       return { mode: 'slideshow', promoTextMichelin, promoTextBfGoodrich };
     }
 
-    const enrichedItems = await this.enrichItems(quotation.items);
-
-    return { mode: 'quotation', quotation: { ...quotation, items: enrichedItems }, promoTextMichelin, promoTextBfGoodrich };
+    return { mode: 'quotation', quotation, promoTextMichelin, promoTextBfGoodrich };
   }
 
   setStaffQuotation(shopId: string, staffId: string, quotationId: string) {
@@ -203,10 +180,7 @@ export class DisplayService {
       return null;
     }
 
-    // Enrich items with discount fields from their price entries (same as QuotationsService.findOne)
-    const enrichedItems = await this.enrichItems(quotation.items);
-
-    return { ...quotation, items: enrichedItems };
+    return quotation;
   }
 
   async clearActiveQuotation(shopId: string) {

@@ -192,6 +192,8 @@ model Quotation {
   createdBy   User            @relation(fields: [createdById], references: [id])
   createdById String
   createdAt   DateTime        @default(now())
+  // Bumped on every edit — stale-draft cleanup measures inactivity, not age
+  updatedAt   DateTime        @updatedAt @default(now())
 
   items QuotationItem[]
   sales Sale[]
@@ -223,6 +225,16 @@ model QuotationItem {
   isIndividual     Boolean @default(false)
   priceOverride    Boolean @default(false)
   overrideNote     String?
+
+  // Snapshotted from the PriceEntry at creation, like unitPrice* above.
+  // priceEntryId is a plain String with no FK, and price-list re-imports
+  // cascade-delete PriceEntry rows, so resolving these at read time made
+  // old quotations render as 0. A quote is a record; its prices are fixed.
+  priceListed      Float   @default(0)
+  discTradeIn      Float   @default(0)
+  discCard         Float   @default(0)
+  discCash         Float   @default(0)
+  discPromo        Float   @default(0)
 }
 
 model Sale {
