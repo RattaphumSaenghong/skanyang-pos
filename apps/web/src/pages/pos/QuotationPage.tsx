@@ -19,6 +19,8 @@ type PaymentRow = {
   note: string;
 };
 
+const SERVICE_PACKAGE_PRICE = 2000;
+
 function paymentRowClass(label: string): string {
   if (label === '0%') return 'bg-pink-50 hover:bg-pink-100';
   if (label === 'บัตร') return 'bg-sky-50 hover:bg-sky-100';
@@ -233,6 +235,7 @@ export default function QuotationPage() {
   if (!quotation) return <div className="p-6 text-red-500">ไม่พบใบเสนอราคา</div>;
 
   const items = quotation.items ?? [];
+  const hasTireSet = items.some((item: any) => item.isSetPricing);
 
   const qNum = `PO${String(quotation.number).padStart(5, '0')}`;
 
@@ -257,7 +260,7 @@ export default function QuotationPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
           <thead style={{ background: '#e5e7eb' }}>
             <tr>
-              {['No', 'ยี่ห้อ/รุ่น/ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'รวม(หลังส่วนลด)', 'วิธีการชำระ'].map((h) => (
+              {['No', 'ยี่ห้อ/รุ่น/ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'ส่วนลดเดือน 8', 'วิธีการชำระ'].map((h) => (
                 <th key={h} style={{ border: '1px solid #6b7280', padding: '7px 9px', whiteSpace: 'nowrap', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ/รุ่น/ขนาด' || h === 'วิธีการชำระ' ? 'left' : 'right', color: '#111', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700 }}>
                   {h}
                 </th>
@@ -316,6 +319,21 @@ export default function QuotationPage() {
                 );
               });
             })}
+            {hasTireSet && (
+              <tr style={{ background: '#f3f4f6' }}>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'center', fontWeight: 600 }}>{items.length + 1}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 10px', fontWeight: 700 }}>ชุดบริการ + Icare</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'center', fontWeight: 700 }}>1</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', color: '#374151', fontSize: '0.75rem' }}>โปรโมชั่น</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -482,7 +500,7 @@ export default function QuotationPage() {
               <th className="border px-2 py-2 text-right">ราคา/เส้น</th>
               <th className="border px-2 py-2 text-center">จำนวน</th>
               <th className="border px-2 py-2 text-right">รวม(ชุด)</th>
-              <th className="border px-2 py-2 text-right">รวม(หลังส่วนลด)</th>
+              <th className="border px-2 py-2 text-right">ส่วนลดเดือน 8</th>
               <th className="border px-2 py-2 text-left">วิธีการชำระ</th>
             </tr>
           </thead>
@@ -587,6 +605,21 @@ export default function QuotationPage() {
                 </tr>
               ));
             })}
+            {hasTireSet && (
+              <tr className="bg-gray-50">
+                <td className="border px-2 py-2 text-center font-medium">{items.length + 1}</td>
+                <td className="border px-2 py-2 font-medium">ชุดบริการ + Icare</td>
+                <td className="border px-2 py-2 text-right font-mono">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-right">-</td>
+                <td className="border px-2 py-2 text-right">-</td>
+                <td className="border px-2 py-2 text-right font-mono">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-center">1</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">0</td>
+                <td className="border px-2 py-2 text-gray-600">โปรโมชั่น</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
