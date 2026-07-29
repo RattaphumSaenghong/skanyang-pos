@@ -14,6 +14,8 @@ const UsersSettingsPage = lazy(() => import('../pages/settings/UsersSettingsPage
 const BayBoardPage = lazy(() => import('../pages/bays/BayBoardPage'));
 const BaysSettingsPage = lazy(() => import('../pages/settings/BaysSettingsPage'));
 const CustomerDisplayPage = lazy(() => import('../pages/display/CustomerDisplayPage'));
+const BillMatcherPage = lazy(() => import('../pages/bills/BillMatcherPage'));
+const BillPrintPage = lazy(() => import('../pages/bills/BillPrintPage'));
 
 export default function App() {
   return (
@@ -43,6 +45,8 @@ export default function App() {
           <Route path="reports/bays" element={<ReportsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="bays/board" element={<BayBoardPage />} />
+          <Route path="bills/matcher" element={<BillMatcherPage />} />
+          <Route path="bills/:batchId/print/:billId" element={<BillPrintPage />} />
           <Route path="settings/users" element={<UsersSettingsPage />} />
           <Route path="settings/bays" element={<BaysSettingsPage />} />
         </Route>

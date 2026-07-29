@@ -16,6 +16,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { DisplayModule } from '../display/display.module';
 import { BaysModule } from '../bays/bays.module';
 import { ServiceCatalogModule } from '../service-catalog/service-catalog.module';
+import { BillMatcherModule } from '../bill-matcher/bill-matcher.module';
 import { IpWhitelistMiddleware } from '../common/middleware/ip-whitelist.middleware';
 
 @Module({
@@ -50,6 +51,7 @@ import { IpWhitelistMiddleware } from '../common/middleware/ip-whitelist.middlew
     DisplayModule,
     BaysModule,
     ServiceCatalogModule,
+    BillMatcherModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

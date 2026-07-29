@@ -37,6 +37,8 @@ model Shop {
   bays           Bay[]
   services       Service[]
   bayJobs        BayJob[]
+  billBatches    BillBatch[]
+  serviceFees    ServiceFee[]
 }
 
 model User {
@@ -451,4 +453,140 @@ model BayJobService {
   // renaming or deactivating a Service must not rewrite finished jobs.
   name      String
   minutes   Int
+}
+
+// ---------------------------------------------------------------------------
+// Bills matcher
+//
+// A month's VAT bills arrive as bare amounts (เตรียมยอดอย่างย่อ) and the stock
+// report (รายงานยาง) supplies known sold quantities in ขายรวม (column I). The
+// matcher distributes exactly those items — plus service fees — across bills.
+//
+// Every amount here is WHOLE BAHT as an Int. The matcher does exact subset-sum
+// and floats would break it; both source sheets are integer-valued anyway.
+// ---------------------------------------------------------------------------
+
+model BillBatch {
+  id          String          @id @default(cuid())
+  shop        Shop            @relation(fields: [shopId], references: [id])
+  shopId      String
+  label       String // "มิถุนายน 2569"
+  periodMonth Int // 1-12
+  periodYear  Int // Buddhist era, e.g. 2569
+  sourceFile  String?
+  status      BillBatchStatus @default(DRAFT)
+  createdAt   DateTime        @default(now())
+  matchedAt   DateTime?
+
+  bills     Bill[]
+  poolItems BillPoolItem[]
+
+  @@unique([shopId, periodYear, periodMonth])
+}
+
+enum BillBatchStatus {
+  DRAFT
+  MATCHED
+  CONFIRMED
+}
+
+/// One row of the monthly stock sheet — the pool the matcher draws from.
+model BillPoolItem {
+  id        String    @id @default(cuid())
+  batch     BillBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId   String
+  sortOrder Int
+
+  category String // รายการสินค้า — ยางนอก, ดิสเบรค, โช๊คอัพ, ...
+  brand    String
+  model    String
+  size     String
+
+  soldQty    Int // ขายรวม (column I) — known quantity supplied by the user
+  matchedQty Int @default(0) // how many known sold units were allocated to bills
+
+  unitPrice Int // ราคาขาย
+  costExVat Int? // ราคาต้นทุนไม่รวม vat
+
+  lines BillLine[]
+
+  @@index([batchId])
+}
+
+model Bill {
+  id       String    @id @default(cuid())
+  batch    BillBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId  String
+  seq      Int
+  billDate DateTime?
+  amount   Int
+
+  /// Pinned by hand — re-running the matcher leaves these alone and reserves
+  /// their stock before anything else is assigned.
+  locked Boolean    @default(false)
+  status BillStatus @default(UNMATCHED)
+
+  lines BillLine[]
+
+  @@index([batchId])
+}
+
+enum BillStatus {
+  UNMATCHED
+  MATCHED
+}
+
+model BillLine {
+  id     String @id @default(cuid())
+  bill   Bill   @relation(fields: [billId], references: [id], onDelete: Cascade)
+  billId String
+
+  kind       BillLineKind
+  poolItem   BillPoolItem? @relation(fields: [poolItemId], references: [id])
+  poolItemId String?
+
+  /// Which ServiceFee produced this line, for traceability when tuning the
+  /// catalogue. Deliberately not a foreign key: fees are soft-deleted and
+  /// re-priced, and a finished bill must not change under them.
+  serviceFeeId String?
+
+  /// Denormalized so a printed bill still reads correctly after the pool item
+  /// or the fee it came from is edited.
+  description String
+  qty         Int
+  unitPrice   Int
+  lineTotal   Int
+
+  @@index([billId])
+}
+
+enum BillLineKind {
+  ITEM
+  SERVICE
+  FREEFORM
+}
+
+/// Priced service fees used as filler. Distinct from `Service`, which is the
+/// bay-scheduling catalog and carries minutes rather than money.
+///
+/// Prices are RANGES: the shop charges ปะยาง somewhere between 100 and 200
+/// depending on the damage. That slack is what lets the matcher close a gap
+/// exactly instead of falling back to a generic line.
+model ServiceFee {
+  id       String @id @default(cuid())
+  shop     Shop   @relation(fields: [shopId], references: [id])
+  shopId   String
+  name     String
+  minPrice Int
+  maxPrice Int
+  maxQty   Int    @default(1)
+
+  /// Mutual-exclusion group. At most one fee per group lands on a bill, so a
+  /// bill never shows both ตั้งศูนย์ and สลับยางถ่วงล้อ + ตั้งศูนย์.
+  group String
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  @@unique([shopId, name])
 }
