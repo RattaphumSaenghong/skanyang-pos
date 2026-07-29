@@ -19,6 +19,10 @@ type PaymentRow = {
   note: string;
 };
 
+// Included with any 4-tire set, fully offset by an equal promo discount — a
+// net-zero package, not a real charge, so it isn't a backend QuotationItem.
+const SERVICE_PACKAGE_PRICE = 2000;
+
 function paymentRowClass(label: string): string {
   if (label === '0%') return 'bg-pink-50 hover:bg-pink-100';
   if (label === 'บัตร') return 'bg-sky-50 hover:bg-sky-100';
@@ -233,6 +237,10 @@ export default function QuotationPage() {
   if (!quotation) return <div className="p-6 text-red-500">ไม่พบใบเสนอราคา</div>;
 
   const items = quotation.items ?? [];
+  // Same rule buildPaymentRows already uses for "this is a set purchase": the
+  // isSetPricing flag (a per-SKU Excel import setting) OR a plain qty of 4,
+  // since most tires aren't flagged as set-priced but still get bought in sets.
+  const hasTireSet = items.some((item: any) => item.isSetPricing || item.qty % 4 === 0);
 
   const qNum = `PO${String(quotation.number).padStart(5, '0')}`;
 
@@ -316,6 +324,23 @@ export default function QuotationPage() {
                 );
               });
             })}
+            {hasTireSet && (
+              <tr style={{ background: '#f3f4f6' }}>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'center', fontWeight: 600 }}>{items.length + 1}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 10px', fontWeight: 700 }}>ชุดบริการ + Icare</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace' }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right' }}>—</td>
+                {/* Not a brand promo — it's an included package, so ลดโปรฯ stays blank
+                    and รวม(ชุด) shows the actual 0 baht it adds to the total. */}
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'center', fontWeight: 700 }}>1</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
+                <td style={{ border: '1px solid #6b7280', padding: '5px 9px', color: '#374151', fontSize: '0.75rem' }}>แถมฟรี</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -587,6 +612,23 @@ export default function QuotationPage() {
                 </tr>
               ));
             })}
+            {hasTireSet && (
+              <tr className="bg-gray-50">
+                <td className="border px-2 py-2 text-center font-medium">{items.length + 1}</td>
+                <td className="border px-2 py-2 font-medium">ชุดบริการ + Icare</td>
+                <td className="border px-2 py-2 text-right font-mono">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-right">-</td>
+                <td className="border px-2 py-2 text-right">-</td>
+                {/* Not a brand promo — it's an included package, so ลดโปรฯ stays
+                    blank and รวม(ชุด) shows the actual 0 baht it adds to the total. */}
+                <td className="border px-2 py-2 text-right">-</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td className="border px-2 py-2 text-center">1</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">0</td>
+                <td className="border px-2 py-2 text-right font-mono font-semibold">0</td>
+                <td className="border px-2 py-2 text-gray-600">แถมฟรี</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
