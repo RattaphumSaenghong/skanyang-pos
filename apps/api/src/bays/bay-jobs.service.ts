@@ -315,4 +315,68 @@ export class BayJobsService {
       orderBy: { scheduledAt: 'asc' },
     });
   }
+
+  async getJobsReport(
+    shopId: string,
+    dateFrom?: string,
+    dateTo?: string,
+    bayId?: string,
+  ) {
+    const whereClause: any = { shopId, status: { in: [BayJobStatus.DONE, BayJobStatus.CANCELLED, BayJobStatus.NO_SHOW] } };
+
+    if (dateFrom && isValidDateString(dateFrom)) {
+      const { start } = dayRangeUtc(dateFrom);
+      whereClause.finishedAt = { gte: start };
+    }
+
+    if (dateTo && isValidDateString(dateTo)) {
+      const { end } = dayRangeUtc(dateTo);
+      if (whereClause.finishedAt) {
+        whereClause.finishedAt.lt = end;
+      } else {
+        whereClause.finishedAt = { lt: end };
+      }
+    }
+
+    if (bayId) {
+      whereClause.bayId = bayId;
+    }
+
+    const jobs = await this.prisma.bayJob.findMany({
+      where: whereClause,
+      include: { bay: true, services: true, createdBy: true },
+      orderBy: { finishedAt: 'desc' },
+    });
+
+    const completedJobs = jobs.filter((j) => j.status === BayJobStatus.DONE);
+
+    const stats = {
+      totalJobs: jobs.length,
+      completedJobs: completedJobs.length,
+      cancelledJobs: jobs.filter((j) => j.status === BayJobStatus.CANCELLED).length,
+      noShowJobs: jobs.filter((j) => j.status === BayJobStatus.NO_SHOW).length,
+      totalMinutes: completedJobs.reduce((sum, j) => {
+        if (!j.startedAt || !j.finishedAt) return sum;
+        return sum + Math.round((j.finishedAt.getTime() - j.startedAt.getTime()) / 60000);
+      }, 0),
+      averageMinutes:
+        completedJobs.length > 0
+          ? Math.round(
+              completedJobs.reduce((sum, j) => {
+                if (!j.startedAt || !j.finishedAt) return sum;
+                return sum + (j.finishedAt.getTime() - j.startedAt.getTime());
+              }, 0) / completedJobs.length / 60000,
+            )
+          : 0,
+      jobsByBay: {} as Record<string, number>,
+    };
+
+    completedJobs.forEach((job) => {
+      if (job.bay) {
+        stats.jobsByBay[job.bay.id] = (stats.jobsByBay[job.bay.id] || 0) + 1;
+      }
+    });
+
+    return { stats, jobs };
+  }
 }

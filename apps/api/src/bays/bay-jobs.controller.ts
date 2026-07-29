@@ -87,4 +87,20 @@ export class BayJobsController {
       resolveShopId(user, shopId),
     );
   }
+
+  @Get('report')
+  getReport(
+    @CurrentUser() user: any,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('bayId') bayId?: string,
+    @Query('shopId') shopId?: string,
+  ) {
+    return this.bayJobs.getJobsReport(
+      resolveShopId(user, shopId),
+      dateFrom,
+      dateTo,
+      bayId,
+    );
+  }
 }

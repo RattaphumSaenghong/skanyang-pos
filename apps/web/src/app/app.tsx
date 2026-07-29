@@ -15,6 +15,7 @@ const StockReportPage = lazy(() => import('../pages/reports/StockReportPage'));
 const UsersSettingsPage = lazy(() => import('../pages/settings/UsersSettingsPage'));
 const BayBoardPage = lazy(() => import('../pages/bays/BayBoardPage'));
 const BaysSettingsPage = lazy(() => import('../pages/settings/BaysSettingsPage'));
+const BayReportsPage = lazy(() => import('../pages/reports/BayReportsPage'));
 const CustomerDisplayPage = lazy(() => import('../pages/display/CustomerDisplayPage'));
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="reports/margins" element={<MarginsReportPage />} />
           <Route path="reports/sales" element={<SalesReportPage />} />
           <Route path="reports/stock" element={<StockReportPage />} />
+          <Route path="reports/bays" element={<BayReportsPage />} />
           <Route path="bays/board" element={<BayBoardPage />} />
           <Route path="settings/users" element={<UsersSettingsPage />} />
           <Route path="settings/bays" element={<BaysSettingsPage />} />

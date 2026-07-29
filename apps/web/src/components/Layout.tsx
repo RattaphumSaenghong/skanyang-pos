@@ -17,6 +17,7 @@ const ownerItems = [
   { to: '/reports/margins', label: 'รายงาน', icon: '📊' },
   { to: '/reports/sales', label: 'ยอดขาย', icon: '💰' },
   { to: '/reports/stock', label: 'สต็อกรายวัน', icon: '📋' },
+  { to: '/reports/bays', label: 'ช่องบริการ', icon: '🔧' },
   { to: '/settings/users', label: 'ตั้งค่า', icon: '⚙️' },
   { to: '/settings/bays', label: 'ตั้งค่าช่อง', icon: '🛠️' },
 ];
