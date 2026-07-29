@@ -34,6 +34,9 @@ model Shop {
   ipWhitelist    IpWhitelist[]
   priceLists     PriceList[]
   products       Product[]
+  bays           Bay[]
+  services       Service[]
+  bayJobs        BayJob[]
 }
 
 model User {
@@ -50,6 +53,7 @@ model User {
 
   quotations Quotation[]
   sales      Sale[]
+  bayJobs    BayJob[]
 }
 
 enum Role {
@@ -350,4 +354,101 @@ model AuditLog {
   userAgent String?
   success   Boolean
   createdAt DateTime   @default(now())
+}
+
+model Bay {
+  id        String   @id @default(cuid())
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  shopId    String
+  name      String
+  mode      BayMode  @default(GENERAL)
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  jobs BayJob[]
+
+  @@unique([shopId, name])
+}
+
+enum BayMode {
+  GENERAL // takes walk-ins and bookings
+  BOOKING_ONLY // only jobs with kind = BOOKING
+}
+
+model Service {
+  id               String   @id @default(cuid())
+  shop             Shop     @relation(fields: [shopId], references: [id])
+  shopId           String
+  name             String
+  estimatedMinutes Int
+  requiresBay      Boolean  @default(true)
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  jobServices BayJobService[]
+
+  @@unique([shopId, name])
+}
+
+model BayJob {
+  id     String @id @default(cuid())
+  shop   Shop   @relation(fields: [shopId], references: [id])
+  shopId String
+  // Reserved bay while BOOKED, occupied bay while IN_PROGRESS, null while WAITING.
+  bay    Bay?   @relation(fields: [bayId], references: [id])
+  bayId  String?
+
+  kind   BayJobKind
+  status BayJobStatus @default(WAITING)
+
+  plateNumber  String
+  customerName String?
+  phone        String?
+  vehicleModel String?
+  note         String?
+
+  scheduledAt DateTime? // BOOKING only
+  // Sum of the service minutes at creation, editable afterwards. Snapshotted
+  // rather than derived so editing the catalog never rewrites a live estimate.
+  estimatedMinutes Int
+  queuedAt         DateTime? // entered the waiting list
+  startedAt        DateTime?
+  finishedAt       DateTime?
+
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services BayJobService[]
+
+  @@index([shopId, status])
+  @@index([shopId, scheduledAt])
+}
+
+enum BayJobKind {
+  WALK_IN
+  BOOKING
+}
+
+enum BayJobStatus {
+  BOOKED
+  WAITING
+  IN_PROGRESS
+  DONE
+  CANCELLED
+  NO_SHOW
+}
+
+model BayJobService {
+  id        String   @id @default(cuid())
+  job       BayJob   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId     String
+  service   Service? @relation(fields: [serviceId], references: [id])
+  serviceId String? // null for a free-text ad-hoc service
+  // Snapshotted at creation, exactly like QuotationItem snapshots its prices —
+  // renaming or deactivating a Service must not rewrite finished jobs.
+  name      String
+  minutes   Int
 }

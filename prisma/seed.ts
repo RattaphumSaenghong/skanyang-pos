@@ -50,6 +50,36 @@ async function main() {
     update: {},
   });
 
+  // Bays and the service catalog, for both shops. The migration backfills bays
+  // for shops that already exist in a deployed database; this covers a fresh
+  // seed, where that INSERT had no rows to work with.
+  const services = [
+    { name: 'เปลี่ยนยาง 4 เส้น', estimatedMinutes: 60, requiresBay: true },
+    { name: 'เปลี่ยนยาง 2 เส้น', estimatedMinutes: 35, requiresBay: true },
+    { name: 'ตั้งศูนย์ถ่วงล้อ', estimatedMinutes: 45, requiresBay: true },
+    { name: 'ถ่วงล้อ', estimatedMinutes: 30, requiresBay: true },
+    { name: 'สลับยาง', estimatedMinutes: 30, requiresBay: true },
+    { name: 'ปะยาง', estimatedMinutes: 20, requiresBay: true },
+    { name: 'เติมลม / ตรวจเช็ค', estimatedMinutes: 10, requiresBay: false },
+  ];
+
+  for (const shop of [shop1, shop2]) {
+    for (let n = 1; n <= 4; n++) {
+      await prisma.bay.upsert({
+        where: { shopId_name: { shopId: shop.id, name: `ช่อง ${n}` } },
+        create: { shopId: shop.id, name: `ช่อง ${n}`, sortOrder: n },
+        update: {},
+      });
+    }
+    for (const [i, s] of services.entries()) {
+      await prisma.service.upsert({
+        where: { shopId_name: { shopId: shop.id, name: s.name } },
+        create: { shopId: shop.id, sortOrder: i, ...s },
+        update: {},
+      });
+    }
+  }
+
   console.log('Seed complete.');
   console.log('  owner / owner1234  (full access, both shops)');
   console.log('  staff1 / staff1234 (shop 1 only)');

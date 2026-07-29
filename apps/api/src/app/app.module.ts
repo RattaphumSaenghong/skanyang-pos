@@ -14,6 +14,8 @@ import { StockModule } from '../stock/stock.module';
 import { ReportsModule } from '../reports/reports.module';
 import { SettingsModule } from '../settings/settings.module';
 import { DisplayModule } from '../display/display.module';
+import { BaysModule } from '../bays/bays.module';
+import { ServiceCatalogModule } from '../service-catalog/service-catalog.module';
 import { IpWhitelistMiddleware } from '../common/middleware/ip-whitelist.middleware';
 
 @Module({
@@ -46,6 +48,8 @@ import { IpWhitelistMiddleware } from '../common/middleware/ip-whitelist.middlew
     ReportsModule,
     SettingsModule,
     DisplayModule,
+    BaysModule,
+    ServiceCatalogModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

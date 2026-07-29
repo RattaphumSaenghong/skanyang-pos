@@ -8,6 +8,7 @@ interface Shop { id: string; name: string }
 
 const navItems = [
   { to: '/pos/search', label: 'POS', icon: '🛒' },
+  { to: '/bays/board', label: 'ช่องบริการ', icon: '🔧' },
   { to: '/stock/dashboard', label: 'คลังสินค้า', icon: '📦' },
   { to: '/products/list', label: 'Upload', icon: '📤' },
 ];
@@ -17,6 +18,7 @@ const ownerItems = [
   { to: '/reports/sales', label: 'ยอดขาย', icon: '💰' },
   { to: '/reports/stock', label: 'สต็อกรายวัน', icon: '📋' },
   { to: '/settings/users', label: 'ตั้งค่า', icon: '⚙️' },
+  { to: '/settings/bays', label: 'ตั้งค่าช่อง', icon: '🛠️' },
 ];
 
 export default function Layout() {
