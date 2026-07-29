@@ -9,13 +9,10 @@ const QuotationPage = lazy(() => import('../pages/pos/QuotationPage'));
 const CheckoutPage = lazy(() => import('../pages/pos/CheckoutPage'));
 const StockDashboardPage = lazy(() => import('../pages/stock/StockDashboardPage'));
 const ProductsImportPage = lazy(() => import('../pages/products/ProductsImportPage'));
-const MarginsReportPage = lazy(() => import('../pages/reports/MarginsReportPage'));
-const SalesReportPage = lazy(() => import('../pages/reports/SalesReportPage'));
-const StockReportPage = lazy(() => import('../pages/reports/StockReportPage'));
+const ReportsPage = lazy(() => import('../pages/reports/ReportsPage'));
 const UsersSettingsPage = lazy(() => import('../pages/settings/UsersSettingsPage'));
 const BayBoardPage = lazy(() => import('../pages/bays/BayBoardPage'));
 const BaysSettingsPage = lazy(() => import('../pages/settings/BaysSettingsPage'));
-const BayReportsPage = lazy(() => import('../pages/reports/BayReportsPage'));
 const CustomerDisplayPage = lazy(() => import('../pages/display/CustomerDisplayPage'));
 
 export default function App() {
@@ -40,10 +37,11 @@ export default function App() {
           <Route path="stock/dashboard" element={<StockDashboardPage />} />
           <Route path="products/list" element={<ProductsImportPage />} />
           <Route path="products/import" element={<ProductsImportPage />} />
-          <Route path="reports/margins" element={<MarginsReportPage />} />
-          <Route path="reports/sales" element={<SalesReportPage />} />
-          <Route path="reports/stock" element={<StockReportPage />} />
-          <Route path="reports/bays" element={<BayReportsPage />} />
+          <Route path="reports/margins" element={<ReportsPage />} />
+          <Route path="reports/sales" element={<ReportsPage />} />
+          <Route path="reports/stock" element={<ReportsPage />} />
+          <Route path="reports/bays" element={<ReportsPage />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="bays/board" element={<BayBoardPage />} />
           <Route path="settings/users" element={<UsersSettingsPage />} />
           <Route path="settings/bays" element={<BaysSettingsPage />} />
