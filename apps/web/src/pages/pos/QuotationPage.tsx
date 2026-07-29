@@ -237,10 +237,11 @@ export default function QuotationPage() {
   if (!quotation) return <div className="p-6 text-red-500">ไม่พบใบเสนอราคา</div>;
 
   const items = quotation.items ?? [];
-  // Same rule buildPaymentRows already uses for "this is a set purchase": the
-  // isSetPricing flag (a per-SKU Excel import setting) OR a plain qty of 4,
-  // since most tires aren't flagged as set-priced but still get bought in sets.
-  const hasTireSet = items.some((item: any) => item.isSetPricing || item.qty % 4 === 0);
+  // "This is a set purchase": the isSetPricing flag (a per-SKU Excel import
+  // setting) OR at least 4 tires, since most tires aren't flagged as set-priced
+  // but still get bought in sets. A 5th spare tire doesn't take the package
+  // away, so this is >= 4 rather than a multiple of 4.
+  const hasTireSet = items.some((item: any) => item.isSetPricing || item.qty >= 4);
 
   const qNum = `PO${String(quotation.number).padStart(5, '0')}`;
 

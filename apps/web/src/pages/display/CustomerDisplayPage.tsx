@@ -261,9 +261,9 @@ export default function CustomerDisplayPage() {
   }
 
   // Same rule QuotationPage uses for "this is a set purchase": the isSetPricing
-  // flag (a per-SKU Excel import setting) OR a plain qty of 4. Must stay
+  // flag (a per-SKU Excel import setting) OR at least 4 tires. Must stay
   // identical to the staff page or the customer sees a package the quote omits.
-  const hasTireSet = (quotation?.items ?? []).some((item) => item.isSetPricing || item.qty % 4 === 0);
+  const hasTireSet = (quotation?.items ?? []).some((item) => item.isSetPricing || item.qty >= 4);
 
   // ─── Quotation overlay (highest priority) ────────────────────────────────
   const quotationLayer = quotation ? (
