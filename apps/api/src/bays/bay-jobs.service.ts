@@ -292,9 +292,12 @@ export class BayJobsService {
       throw new BadRequestException('ไม่สามารถยกเลิกคิวนี้ได้');
     }
 
+    // finishedAt is what the history report filters and sorts on, so a job that
+    // ends by being cancelled needs one too — otherwise it is invisible to any
+    // date range and sorts unpredictably against jobs that have one.
     return this.prisma.bayJob.update({
       where: { id },
-      data: { status: target },
+      data: { status: target, finishedAt: new Date() },
       include: { services: true },
     });
   }

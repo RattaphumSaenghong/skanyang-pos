@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Role } from '@prisma/client';
 import { resolveShopId } from '../common/shop-scope';
 import { BayJobsService } from './bay-jobs.service';
 import { CreateBayJobDto } from './dto/create-bay-job.dto';
@@ -88,7 +90,10 @@ export class BayJobsController {
     );
   }
 
+  // Owner-only, matching the rest of /reports. The other bay-jobs routes stay
+  // open to staff because the shop floor needs them.
   @Get('report')
+  @Roles(Role.OWNER)
   getReport(
     @CurrentUser() user: any,
     @Query('dateFrom') dateFrom?: string,
