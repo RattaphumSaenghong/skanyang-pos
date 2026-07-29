@@ -45,6 +45,8 @@ interface Snapshot {
 
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
 
+const SERVICE_PACKAGE_PRICE = 2000;
+
 function buildPaymentRows(item: QuotationItem): PaymentRow[] {
   if (!item.isSetPricing && item.qty % 4 !== 0) {
     return [
@@ -258,6 +260,11 @@ export default function CustomerDisplayPage() {
     setQuotation(null);
   }
 
+  // Same rule QuotationPage uses for "this is a set purchase": the isSetPricing
+  // flag (a per-SKU Excel import setting) OR a plain qty of 4. Must stay
+  // identical to the staff page or the customer sees a package the quote omits.
+  const hasTireSet = (quotation?.items ?? []).some((item) => item.isSetPricing || item.qty % 4 === 0);
+
   // ─── Quotation overlay (highest priority) ────────────────────────────────
   const quotationLayer = quotation ? (
     <div style={{
@@ -371,6 +378,23 @@ export default function CustomerDisplayPage() {
                 </tr>
               ));
             })}
+            {hasTireSet && (
+              <tr style={{ background: '#f9fafb' }}>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', fontWeight: 600 }}>{quotation.items.length + 1}</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px' }} />
+                <td style={{ border: '1px solid #e5e7eb', padding: '10px 12px', fontWeight: 700, fontSize: '1rem' }}>ชุดบริการ + Icare</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right' }}>—</td>
+                {/* Not a brand promo — it's an included package, so ลดโปรฯ stays blank
+                    and รวม(ชุด) shows the actual 0 baht it adds to the total. */}
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right' }}>—</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>1</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#6b7280' }}>แถมฟรี</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
