@@ -24,6 +24,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { resolveShopId } from '../common/shop-scope';
 import { BillMatcherService } from './bill-matcher.service';
+import { CloseGapDto } from './dto/close-gap.dto';
 import { ImportBillBatchDto } from './dto/import-bill-batch.dto';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
@@ -128,6 +129,43 @@ export class BillMatcherController {
     @Query('shopId') shopId?: string,
   ) {
     return this.service.matchBatch(id, resolveShopId(user, shopId), dto);
+  }
+
+  /** The engine's shortlist for one bill — auto-match as an assistant. */
+  @Get(':id/bills/:billId/suggestions')
+  @Roles(Role.OWNER)
+  suggestions(
+    @Param('id') id: string,
+    @Param('billId') billId: string,
+    @CurrentUser() user: any,
+    @Query('shopId') shopId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsed = limit ? Number(limit) : undefined;
+    return this.service.suggestForBill(
+      id,
+      billId,
+      resolveShopId(user, shopId),
+      parsed && parsed > 0 ? parsed : undefined,
+    );
+  }
+
+  /** Service lines that close whatever the operator's draft leaves short. */
+  @Post(':id/bills/:billId/close-gap')
+  @Roles(Role.OWNER)
+  closeGap(
+    @Param('id') id: string,
+    @Param('billId') billId: string,
+    @CurrentUser() user: any,
+    @Body() dto: CloseGapDto,
+    @Query('shopId') shopId?: string,
+  ) {
+    return this.service.closeGapForBill(
+      id,
+      billId,
+      resolveShopId(user, shopId),
+      dto,
+    );
   }
 
   @Patch(':id/bills/:billId')

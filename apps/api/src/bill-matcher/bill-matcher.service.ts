@@ -16,6 +16,13 @@ import {
   PoolItemInput,
   ServiceFeeInput,
 } from '../bill-matcher/engine/matcher';
+import { MAX_MULTIPLICITY } from '../bill-matcher/engine/archetypes';
+import {
+  closeGap,
+  contextFromLines,
+  suggestForBill,
+} from '../bill-matcher/engine/suggest';
+import { CloseGapDto } from './dto/close-gap.dto';
 import { ImportBillBatchDto } from './dto/import-bill-batch.dto';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
@@ -362,6 +369,8 @@ export class BillMatcherService {
     // If replacing lines
     if (dto.lines !== undefined) {
       const lines = dto.lines;
+      // A batch with no recorded sold quantities has no ceiling to enforce.
+      const unconstrained = await this.hasNoSoldQuantities(batchId);
       const result = await this.prisma.$transaction(async (tx) => {
         // Read the outgoing lines BEFORE deleting them. An item that this edit
         // removes still needs its matchedQty recomputed, and once the rows are
@@ -406,7 +415,7 @@ export class BillMatcherService {
             throw new BadRequestException('รายการสินค้าไม่อยู่ในแบตช์นี้');
           }
           const matchedQty = totalSold._sum.qty ?? 0;
-          if (matchedQty > poolItem.soldQty) {
+          if (!unconstrained && matchedQty > poolItem.soldQty) {
             throw new BadRequestException(
               `จำนวนที่จับคู่ (${matchedQty}) มากกว่าขายรวม (${poolItem.soldQty})`,
             );
@@ -439,6 +448,144 @@ export class BillMatcherService {
       where: { id: billId },
       include: { lines: true },
     });
+  }
+
+  /**
+   * Whether this batch records sold quantities at all.
+   *
+   * A stock sheet with ขายรวม (column I) left blank imports as soldQty 0 on every
+   * row — which is the shop's actual June 2569 file. Zero there means "not
+   * recorded", not "none sold", so enforcing it as a ceiling would refuse every
+   * item on every bill and make the workbench inert. When the whole batch sums to
+   * zero the ceiling is dropped instead. A batch that does carry quantities keeps
+   * them enforced, and a 0 on one row there genuinely means none.
+   */
+  private async hasNoSoldQuantities(batchId: string): Promise<boolean> {
+    const agg = await this.prisma.billPoolItem.aggregate({
+      where: { batchId },
+      _sum: { soldQty: true },
+    });
+    return (agg._sum.soldQty ?? 0) === 0;
+  }
+
+  /**
+   * Load a bill together with the stock still free for it.
+   *
+   * Capacity deliberately ignores what this bill already holds: both callers
+   * REPLACE its lines rather than adding to them, so its own units are back in
+   * the pool from their point of view.
+   */
+  private async billWorkspace(
+    batchId: string,
+    billId: string,
+    shopId: string,
+  ) {
+    const batch = await this.prisma.billBatch.findFirst({
+      where: { id: batchId, shopId },
+      include: { poolItems: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!batch) throw new NotFoundException('ไม่พบใบรวมนี้');
+
+    const bill = await this.prisma.bill.findFirst({
+      where: { id: billId, batchId },
+      include: { lines: true },
+    });
+    if (!bill) throw new NotFoundException('ไม่พบบิลนี้');
+
+    // Aggregate the real line rows rather than trusting the matchedQty column,
+    // so a suggestion can never hand out stock another bill is already using.
+    const usedElsewhere = await this.prisma.billLine.groupBy({
+      by: ['poolItemId'],
+      // Prisma v7.8.0 requires `is:` on nested to-one filters.
+      where: { bill: { is: { batchId } }, billId: { not: billId } },
+      _sum: { qty: true },
+    });
+    const usedByItem = new Map<string, number>();
+    for (const row of usedElsewhere) {
+      if (row.poolItemId) usedByItem.set(row.poolItemId, row._sum.qty ?? 0);
+    }
+
+    const pool: PoolItemInput[] = batch.poolItems.map((item) => ({
+      id: item.id,
+      sortOrder: item.sortOrder,
+      category: item.category,
+      brand: item.brand,
+      model: item.model,
+      size: item.size,
+      soldQty: item.soldQty,
+      unitPrice: item.unitPrice,
+      costExVat: item.costExVat,
+    }));
+    const unconstrained = await this.hasNoSoldQuantities(batchId);
+    const capacity = unconstrained
+      ? pool.map(() => MAX_MULTIPLICITY)
+      : pool.map((item) =>
+          Math.max(0, item.soldQty - (usedByItem.get(item.id) ?? 0)),
+        );
+
+    const fees = await this.serviceFees.findAll(shopId);
+    const feeInputs: ServiceFeeInput[] = fees.map((f) => ({
+      id: f.id,
+      name: f.name,
+      minPrice: f.minPrice,
+      maxPrice: f.maxPrice,
+      maxQty: f.maxQty,
+      group: f.group,
+    }));
+
+    return { bill, pool, capacity, feeInputs };
+  }
+
+  /** The engine's shortlist for one bill, for the operator to pick from. */
+  async suggestForBill(
+    batchId: string,
+    billId: string,
+    shopId: string,
+    limit?: number,
+  ) {
+    const { bill, pool, capacity, feeInputs } = await this.billWorkspace(
+      batchId,
+      billId,
+      shopId,
+    );
+    return {
+      billId,
+      amount: bill.amount,
+      suggestions: suggestForBill(
+        bill.amount,
+        pool,
+        capacity,
+        feeInputs,
+        limit,
+      ),
+    };
+  }
+
+  /**
+   * Service lines that close whatever `dto.lines` leaves short of the bill
+   * amount. Nothing is persisted — the client folds these into its draft and
+   * saves through updateBill.
+   */
+  async closeGapForBill(
+    batchId: string,
+    billId: string,
+    shopId: string,
+    dto: CloseGapDto,
+  ) {
+    const { bill, pool, feeInputs } = await this.billWorkspace(
+      batchId,
+      billId,
+      shopId,
+    );
+
+    const draft = dto.lines ?? [];
+    const gap =
+      bill.amount - draft.reduce((sum, line) => sum + line.lineTotal, 0);
+    if (gap <= 0) return { gap, lines: [] };
+
+    const poolById = new Map(pool.map((item) => [item.id, item]));
+    const lines = closeGap(gap, contextFromLines(draft, poolById), feeInputs);
+    return { gap, lines: lines ?? [] };
   }
 
   async deleteBatch(id: string, shopId: string) {

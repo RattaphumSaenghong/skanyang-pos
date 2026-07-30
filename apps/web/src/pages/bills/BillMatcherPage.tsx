@@ -1,83 +1,18 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
+import BillMatchWorkspace from './BillMatchWorkspace';
+import { Batch, BatchDetail, ServiceFee } from './types';
 
 type Tab = 'import' | 'match' | 'fees';
 
-interface Batch {
-  id: string;
-  label: string;
-  periodMonth: number;
-  periodYear: number;
-  status: string;
-  createdAt: string;
-  _count: { bills: number };
-}
-
-interface Bill {
-  id: string;
-  seq: number;
-  billDate: string;
-  amount: number;
-  locked: boolean;
-  status: string;
-  lines: BillLine[];
-}
-
-interface BillLine {
-  id: string;
-  kind: 'ITEM' | 'SERVICE' | 'FREEFORM';
-  poolItemId: string | null;
-  description: string;
-  qty: number;
-  unitPrice: number;
-  lineTotal: number;
-}
-
-interface PoolItem {
-  id: string;
-  sortOrder: number;
-  category: string;
-  brand: string;
-  model: string;
-  size: string;
-  soldQty: number;
-  matchedQty: number;
-  unitPrice: number;
-}
-
-interface BatchDetail {
-  id: string;
-  label: string;
-  periodMonth: number;
-  periodYear: number;
-  status: string;
-  createdAt: string;
-  bills: Bill[];
-  poolItems: PoolItem[];
-}
-
-interface ServiceFee {
-  id: string;
-  name: string;
-  minPrice: number;
-  maxPrice: number;
-  maxQty: number;
-  group: string;
-  active: boolean;
-  sortOrder: number;
-}
-
 export default function BillMatcherPage() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const effectiveShopId = useAuthStore((s) => s.effectiveShopId());
 
   const [activeTab, setActiveTab] = useState<Tab>('import');
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
-  const [sortBySeq, setSortBySeq] = useState(false);
 
   // Import tab state. Bills and stock normally arrive as two separate
   // workbooks; dropping only the bills file falls back to picking both sheets
@@ -172,32 +107,6 @@ export default function BillMatcherPage() {
     },
   });
 
-  const runMatch = useMutation({
-    mutationFn: () => {
-      if (!selectedBatchId) return Promise.reject();
-      return api
-        .post(`/bill-batches/${selectedBatchId}/match`, { timeBudgetMs: 3000 })
-        .then((r) => r.data);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bill-batch', selectedBatchId] });
-    },
-  });
-
-  const toggleBillLock = useMutation({
-    mutationFn: (bill: Bill) => {
-      if (!selectedBatchId) return Promise.reject();
-      return api
-        .patch(`/bill-batches/${selectedBatchId}/bills/${bill.id}`, {
-          locked: !bill.locked,
-        })
-        .then((r) => r.data);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bill-batch', selectedBatchId] });
-    },
-  });
-
   const saveServiceFee = useMutation({
     mutationFn: (fee: ServiceFee) => {
       return api.patch(`/service-fees/${fee.id}`, fee).then((r) => r.data);
@@ -236,37 +145,17 @@ export default function BillMatcherPage() {
     setImportForm((f) => ({ ...f, itemSheet: names[0] ?? '' }));
   };
 
-  const getSortedBills = (): Bill[] => {
-    if (!batchDetail?.bills) return [];
-    if (sortBySeq) return [...batchDetail.bills].sort((a, b) => a.seq - b.seq);
-
-    // Sort by priority: FREEFORM first, then UNMATCHED, then rest by seq
-    const withFreeform = batchDetail.bills.filter((b) =>
-      b.lines.some((l) => l.kind === 'FREEFORM'),
-    );
-    const unmatched = batchDetail.bills.filter(
-      (b) =>
-        !b.lines.some((l) => l.kind === 'FREEFORM') && b.status === 'UNMATCHED',
-    );
-    const rest = batchDetail.bills
-      .filter(
-        (b) =>
-          !b.lines.some((l) => l.kind === 'FREEFORM') &&
-          b.status !== 'UNMATCHED',
-      )
-      .sort((a, b) => a.seq - b.seq);
-
-    return [...withFreeform, ...unmatched, ...rest];
-  };
-
   const TABS: { key: Tab; label: string }[] = [
     { key: 'import', label: 'นำเข้า' },
     { key: 'match', label: 'จับคู่' },
     { key: 'fees', label: 'ค่าบริการ' },
   ];
 
+  // The match tab is two panels side by side and needs the room.
+  const width = activeTab === 'match' ? 'max-w-[1500px]' : 'max-w-6xl';
+
   return (
-    <div className="p-6 max-w-6xl">
+    <div className={`p-6 ${width}`}>
       <h2 className="text-xl font-bold mb-4">จับคู่บิล</h2>
 
       <div className="flex gap-1 mb-6 border-b">
@@ -567,114 +456,10 @@ export default function BillMatcherPage() {
                 </div>
               )}
 
-              {/* Match button */}
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => runMatch.mutate()}
-                  disabled={runMatch.isPending}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-                >
-                  {runMatch.isPending ? 'กำลังจับคู่...' : 'รันจับคู่'}
-                </button>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={sortBySeq}
-                    onChange={(e) => setSortBySeq(e.target.checked)}
-                  />
-                  จัดเรียงตามลำดับ
-                </label>
-              </div>
-
-              {/* Bills table */}
-              <div className="bg-white rounded-xl border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 text-left">ลำดับ</th>
-                      <th className="px-4 py-3 text-left">วันที่</th>
-                      <th className="px-4 py-3 text-right">ยอด</th>
-                      <th className="px-4 py-3 text-left">รายการ</th>
-                      <th className="px-4 py-3 text-right">ส่วนต่าง</th>
-                      <th className="px-4 py-3 text-center">พิมพ์</th>
-                      <th className="px-4 py-3 text-center">ล็อก</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {getSortedBills().map((bill) => {
-                      const freeformLine = bill.lines.find(
-                        (l) => l.kind === 'FREEFORM',
-                      );
-                      return (
-                        <tr
-                          key={bill.id}
-                          className={`hover:bg-gray-50 ${bill.locked ? 'bg-yellow-50' : ''}`}
-                        >
-                          <td className="px-4 py-3 font-medium">
-                            {String(bill.seq).padStart(3, '0')}
-                          </td>
-                          <td className="px-4 py-3">
-                            {bill.billDate
-                              ? new Date(bill.billDate).toLocaleDateString(
-                                  'th-TH',
-                                )
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {bill.amount.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-xs">
-                            {bill.lines.map((line, i) => (
-                              <div key={i} className="mb-1">
-                                {line.kind === 'FREEFORM' ? (
-                                  <span className="text-red-600 font-medium">
-                                    {line.description}
-                                  </span>
-                                ) : (
-                                  <span>
-                                    {line.description} ×{line.qty}@
-                                    {line.unitPrice.toLocaleString()}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {freeformLine ? (
-                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium">
-                                {freeformLine.lineTotal.toLocaleString()} ฿
-                              </span>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() =>
-                                navigate(
-                                  `/bills/${selectedBatchId}/print/${bill.id}`,
-                                )
-                              }
-                              className="text-blue-600 hover:underline text-xs"
-                            >
-                              พิมพ์
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => toggleBillLock.mutate(bill)}
-                              disabled={toggleBillLock.isPending}
-                              className="text-lg"
-                            >
-                              {bill.locked ? '🔒' : '🔓'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <BillMatchWorkspace
+                batchId={selectedBatchId}
+                batch={batchDetail}
+              />
             </>
           ) : (
             <p className="text-center text-gray-500 py-6">กำลังโหลด...</p>

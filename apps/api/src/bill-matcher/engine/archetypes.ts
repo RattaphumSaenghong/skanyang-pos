@@ -72,3 +72,15 @@ export function archetypeFor(amount: number): Archetype {
   for (const row of TABLE) if (amount <= row.upTo) return row.a;
   return LARGE;
 }
+
+/**
+ * The most units of a single SKU any archetype will ever ask for.
+ *
+ * Stands in as the per-item capacity when a batch has no recorded sold
+ * quantities: there is no real ceiling to enforce, and anything above this is
+ * indistinguishable from unlimited as far as candidate generation is concerned.
+ */
+export const MAX_MULTIPLICITY = Math.max(
+  ...TABLE.flatMap((row) => row.a.multiplicities),
+  ...LARGE.multiplicities,
+);
