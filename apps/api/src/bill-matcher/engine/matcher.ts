@@ -1,3 +1,4 @@
+import { MAX_MULTIPLICITY } from './archetypes';
 import { Candidate, CandidateBuilder } from './candidates';
 import { DEFAULT_TIME_BUDGET_MS, LNS_BATCH, WEIGHTS } from './scoring';
 import {
@@ -75,12 +76,21 @@ export function match(
     }
   }
 
+  // With no recorded quantities there is no real ceiling, so each SKU is given
+  // the most units any archetype could ask for. Locked bills still hold theirs.
+  const unconstrained = opts.unconstrained ?? false;
   const capacity = pool.map((it) =>
-    Math.max(0, it.soldQty - (reserved.get(it.id) ?? 0)),
+    Math.max(
+      0,
+      (unconstrained ? MAX_MULTIPLICITY : it.soldQty) -
+        (reserved.get(it.id) ?? 0),
+    ),
   );
 
   // --- candidates, computed once; availability applied at assign time -------
-  const builder = new CandidateBuilder(pool, capacity, fees);
+  const builder = new CandidateBuilder(pool, capacity, fees, {
+    plausibilityFirst: unconstrained,
+  });
   const candidates: Candidate[][] = open.map((bill) => builder.for(bill.amount));
 
   // --- assignment -----------------------------------------------------------
@@ -113,11 +123,16 @@ export function match(
       }),
       { units: 0, quality: 0 },
     );
+  // Completeness leads only when there are sold quantities to be complete about.
+  // Left in place with none, the repair loop would chase a meaningless unit count
+  // and load every bill with as many items as it could fit.
   const better = (
     a: { units: number; quality: number },
     b: { units: number; quality: number },
   ): boolean =>
-    a.units > b.units || (a.units === b.units && a.quality > b.quality);
+    unconstrained
+      ? a.quality > b.quality
+      : a.units > b.units || (a.units === b.units && a.quality > b.quality);
 
   // Biggest bills first — they have the fewest ways to be satisfied.
   const baseOrder = open
@@ -130,10 +145,12 @@ export function match(
   // Greedy strands bills a slightly different order would have satisfied, so
   // keep tearing up the worst ones and re-seating them until time runs out.
   while (Date.now() - started < budget) {
-    const ranked = [...baseOrder].sort(
-      (a, b) =>
-        (best[a]?.units ?? -1) - (best[b]?.units ?? -1) ||
-        (best[a]?.score ?? -1e9) - (best[b]?.score ?? -1e9),
+    // Worst first, by whichever measure this run is actually optimising.
+    const ranked = [...baseOrder].sort((a, b) =>
+      unconstrained
+        ? (best[a]?.score ?? -1e9) - (best[b]?.score ?? -1e9)
+        : (best[a]?.units ?? -1) - (best[b]?.units ?? -1) ||
+          (best[a]?.score ?? -1e9) - (best[b]?.score ?? -1e9),
     );
     const worst = ranked.slice(0, LNS_BATCH);
     for (let i = worst.length - 1; i > 0; i--) {

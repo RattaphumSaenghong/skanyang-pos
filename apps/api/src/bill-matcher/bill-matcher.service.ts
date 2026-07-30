@@ -236,10 +236,13 @@ export class BillMatcherService {
       group: f.group,
     }));
 
-    // Run the matcher
+    // Run the matcher. Before month end the stock sheet's ขายรวม column is still
+    // blank, and enforcing that as a ceiling would leave every bill on a bare
+    // ค่าบริการ line — a useless first pass exactly when one is most wanted.
     const matchResult = match(billInputs, poolInputs, feeInputs, {
       timeBudgetMs: dto.timeBudgetMs,
       seed: dto.seed,
+      unconstrained: await this.hasNoSoldQuantities(id),
     });
 
     // Persist results in a transaction.

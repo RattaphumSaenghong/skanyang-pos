@@ -82,6 +82,16 @@ export interface MatchOptions {
   timeBudgetMs?: number;
   /** Deterministic runs for tests. Default 1. */
   seed?: number;
+  /**
+   * The pool carries no recorded sold quantities — the stock sheet's ขายรวม
+   * column has not been filled in yet, which is normal before month end.
+   *
+   * Changes the objective, not just the ceiling. Allocating "as many known sold
+   * units as possible" is meaningless when none are known, and pursuing it
+   * anyway makes the engine pile items onto every bill to run the count up. So
+   * unconstrained runs are judged on plausibility alone.
+   */
+  unconstrained?: boolean;
 }
 
 export interface MatchResult {

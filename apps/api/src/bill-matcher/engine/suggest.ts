@@ -45,36 +45,34 @@ export function suggestForBill(
   fees: ServiceFeeInput[],
   limit: number = DEFAULT_LIMIT,
 ): Suggestion[] {
-  const builder = new CandidateBuilder(pool, capacity, fees);
+  const builder = new CandidateBuilder(pool, capacity, fees, {
+    plausibilityFirst: true,
+  });
   const seen = new Set<string>();
-  const distinct = [];
+  const out: Suggestion[] = [];
 
   for (const c of builder.for(amount)) {
     // Candidates come in near-duplicates — the same basket closed with service
-    // lines and again dumped on a free-form line. Within one basket the units are
-    // identical, so the engine's own ordering puts the better variant first and
-    // keeping just that one gives genuinely different choices instead of five
-    // spellings of the same tyre.
+    // lines and again dumped on a free-form line. The list is already ordered
+    // best-first, so keeping the first of each basket gives genuinely different
+    // choices instead of five spellings of the same tyre.
     const key = `${c.itemIdx}:${c.qty}|${c.item2Idx}:${c.qty2}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    distinct.push(c);
+
+    const lines = builder.materialize(c, amount);
+    out.push({
+      score: c.score,
+      units: c.units,
+      freeform: lines
+        .filter((l) => l.kind === 'FREEFORM')
+        .reduce((s, l) => s + l.lineTotal, 0),
+      lines,
+    });
+    if (out.length >= limit) break;
   }
 
-  return distinct
-    .sort((a, b) => b.score - a.score || b.units - a.units)
-    .slice(0, limit)
-    .map((c) => {
-      const lines = builder.materialize(c, amount);
-      return {
-        score: c.score,
-        units: c.units,
-        freeform: lines
-          .filter((l) => l.kind === 'FREEFORM')
-          .reduce((s, l) => s + l.lineTotal, 0),
-        lines,
-      };
-    });
+  return out;
 }
 
 /**

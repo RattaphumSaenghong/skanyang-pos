@@ -4,6 +4,7 @@ import {
   parseBillSheet,
   parseItemSheet,
 } from '../../common/excel/bill-batch-parser';
+import { MAX_MULTIPLICITY } from './archetypes';
 import { match } from './matcher';
 import {
   BillInput,
@@ -113,10 +114,18 @@ const bill = (
   ...extra,
 });
 
-/** Reusable invariant battery — every result must satisfy all of these. */
+/**
+ * Reusable invariant battery — every result must satisfy all of these.
+ *
+ * `unconstrained` swaps only the stock ceiling: a run told the sold quantities
+ * are unrecorded is explicitly allowed past soldQty, and is held to the most
+ * units any archetype could ask for instead. Every plausibility invariant below
+ * applies either way.
+ */
 function checkInvariants(
   result: { bills: MatchedBill[]; matchedByPoolItem: Record<string, number> },
   pool: PoolItemInput[],
+  { unconstrained = false }: { unconstrained?: boolean } = {},
 ) {
   const byId = new Map(pool.map((p) => [p.id, p]));
 
@@ -179,8 +188,8 @@ function checkInvariants(
     expect(item, `sold an unknown pool item ${id}`).toBeDefined();
     expect(
       qty,
-      `allocated more than the known sold quantity for ${id}`,
-    ).toBeLessThanOrEqual(item!.soldQty);
+      `allocated more than the ${unconstrained ? 'notional' : 'known sold'} quantity for ${id}`,
+    ).toBeLessThanOrEqual(unconstrained ? MAX_MULTIPLICITY : item!.soldQty);
   }
 }
 
@@ -364,4 +373,110 @@ describe('bill matcher — real June 2569 batch', () => {
     },
     20_000,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Before month end the stock sheet's ขายรวม column is still blank, so every row
+// imports with soldQty 0. Enforced as a ceiling that leaves the whole month on
+// bare ค่าบริการ lines, which is why the bulk pass can be told to ignore it.
+// ---------------------------------------------------------------------------
+describe('bill matcher engine — no recorded quantities', () => {
+  const opts = { timeBudgetMs: 200, seed: 1, unconstrained: true };
+  const blank = (id: string, price: number, size?: string) =>
+    tire(id, price, 0, size);
+
+  it('leaves every bill on a free-form line without the flag', () => {
+    const pool = [blank('t1', 4000)];
+    const res = match([bill(1, 16000)], pool, FEES, {
+      timeBudgetMs: 200,
+      seed: 1,
+    });
+
+    expect(res.bills[0].lines.every((l) => l.kind !== 'ITEM')).toBe(true);
+    expect(res.bills[0].freeform).toBe(16000);
+  });
+
+  it('backs the same bill with real goods once told quantities are unknown', () => {
+    const pool = [blank('t1', 4000)];
+    const res = match([bill(1, 16000)], pool, FEES, opts);
+
+    const item = res.bills[0].lines.find((l) => l.kind === 'ITEM');
+    expect(item?.poolItemId).toBe('t1');
+    expect(item?.qty).toBe(4);
+    expect(res.bills[0].freeform).toBe(0);
+    checkInvariants(res, pool, { unconstrained: true });
+  });
+
+  it('does not pile on items to run up a meaningless unit count', () => {
+    // Both reach 16,000 exactly: one SKU at 4x4000, or 4x1000 + 4x3000. With no
+    // sold quantities to honour, the clean single-SKU basket has to win.
+    const pool = [blank('t1', 4000), blank('t2', 1000), blank('t3', 3000)];
+    const res = match([bill(1, 16000)], pool, FEES, opts);
+
+    const items = res.bills[0].lines.filter((l) => l.kind === 'ITEM');
+    expect(items).toHaveLength(1);
+    expect(items[0].qty).toBe(4);
+    expect(items[0].unitPrice).toBe(4000);
+  });
+
+  it('still respects real quantities when the pool has them', () => {
+    // The flag is off here, so t1's two units cap it and the rest is service.
+    const pool = [tire('t1', 4000, 2)];
+    const res = match([bill(1, 8600)], pool, FEES, {
+      timeBudgetMs: 200,
+      seed: 1,
+    });
+
+    const item = res.bills[0].lines.find((l) => l.kind === 'ITEM');
+    expect(item?.qty).toBeLessThanOrEqual(2);
+    checkInvariants(res, pool, { unconstrained: true });
+  });
+
+  it('keeps locked bills and their stock untouched', () => {
+    const pool = [blank('t1', 4000)];
+    const locked = bill(1, 16000, {
+      locked: true,
+      existingLines: [
+        {
+          kind: 'ITEM',
+          poolItemId: 't1',
+          description: 'ยางนอก',
+          qty: 2,
+          unitPrice: 4000,
+          lineTotal: 8000,
+        },
+        {
+          kind: 'FREEFORM',
+          description: 'ค่าบริการ',
+          qty: 1,
+          unitPrice: 8000,
+          lineTotal: 8000,
+        },
+      ],
+    });
+    const res = match([locked, bill(2, 4000)], pool, FEES, opts);
+
+    const first = res.bills.find((b) => b.seq === 1)!;
+    expect(first.lines).toHaveLength(2);
+    expect(first.lines[0].qty).toBe(2);
+    // Two of the four notional units are spoken for, so the open bill gets two.
+    expect(res.matchedByPoolItem['t1']).toBeLessThanOrEqual(MAX_MULTIPLICITY);
+  });
+
+  it('produces plausible whole-month output at real scale', () => {
+    const pool = Array.from({ length: 60 }, (_, i) =>
+      blank(`t${i}`, 1000 + i * 250, `2${i}5/55-1${i % 9}`),
+    );
+    const bills = Array.from({ length: 80 }, (_, i) => bill(i + 1, 350 + i * 470));
+    const res = match(bills, pool, FEES, { ...opts, timeBudgetMs: 1000 });
+
+    expect(res.stats.totalBills).toBe(80);
+    // The point of the flag: most bills carry real goods, not bare ค่าบริการ.
+    const withItems = res.bills.filter((b) =>
+      b.lines.some((l) => l.kind === 'ITEM'),
+    );
+    expect(withItems.length).toBeGreaterThan(60);
+    expect(res.stats.avgLinesPerBill).toBeLessThanOrEqual(2.5);
+    checkInvariants(res, pool, { unconstrained: true });
+  });
 });

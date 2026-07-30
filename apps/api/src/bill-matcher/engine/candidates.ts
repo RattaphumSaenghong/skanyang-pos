@@ -72,11 +72,26 @@ export function contextFor(item: PoolItemInput, qty: number): BillContext {
   };
 }
 
+export interface BuilderOptions {
+  /**
+   * Rank candidates by plausibility rather than by units allocated.
+   *
+   * The default puts completeness first, which is right for the bulk pass over a
+   * finished month: sold quantities are facts and every one of them has to land
+   * somewhere. It is wrong anywhere that objective doesn't apply — a shortlist
+   * shown to an operator for one bill, or a pool with no recorded quantities at
+   * all — where it buries the clean set-of-four under mixed baskets that happen
+   * to shift one more unit.
+   */
+  plausibilityFirst?: boolean;
+}
+
 export class CandidateBuilder {
   private readonly fees: ServiceFeeInput[];
   private readonly closers = new Map<string, GapCloser>();
   private readonly byPrice = new Map<number, number[]>();
   private readonly sortedPrices: number[];
+  private readonly plausibilityFirst: boolean;
 
   /**
    * `capacity[i]` is how many units of `pool[i]` are still free. Treated as
@@ -86,7 +101,9 @@ export class CandidateBuilder {
     private readonly pool: PoolItemInput[],
     private readonly capacity: number[],
     fees: ServiceFeeInput[],
+    opts: BuilderOptions = {},
   ) {
+    this.plausibilityFirst = opts.plausibilityFirst ?? false;
     this.fees = fees.filter((f) => f.maxQty > 0 && f.maxPrice >= f.minPrice);
 
     // Price index, for the two-SKU fallback's range lookups.
@@ -261,8 +278,12 @@ export class CandidateBuilder {
 
     // Sold quantities are facts, so allocating more known units outranks every
     // plausibility preference. Quality only decides between equally complete
-    // allocations.
-    out.sort((a, b) => b.units - a.units || b.score - a.score);
+    // allocations. Where there are no such facts to honour, the two swap.
+    out.sort(
+      this.plausibilityFirst
+        ? (a, b) => b.score - a.score || b.units - a.units
+        : (a, b) => b.units - a.units || b.score - a.score,
+    );
     return out.slice(0, MAX_CANDIDATES_PER_BILL);
   }
 
