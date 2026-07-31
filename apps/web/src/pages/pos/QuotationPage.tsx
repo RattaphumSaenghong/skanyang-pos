@@ -29,13 +29,21 @@ function paymentRowClass(label: string): string {
   return 'bg-emerald-50 hover:bg-emerald-100';
 }
 
-function promoTotal(item: any, unitPrice: number): number {
+// Promo only applies to a full set — 4 tires or up. null = no promo for this item.
+function promoTotal(item: any, unitPrice: number): number | null {
+  if (!item.isSetPricing && item.qty < 4) return null;
+  const model = (item.product?.model ?? '').toUpperCase();
+  if (model.includes('XCD')) return null;
   const brand = (item.product?.brand ?? '').toUpperCase();
   const total = unitPrice * item.qty;
-  if (brand.includes('MICHELIN')) return total * 0.8;
-  if ((brand.includes('BFGOODRICH') || brand.includes('BF')) && (item.product?.sizeRim ?? 0) >= 16) {
-    return total - (item.qty / 4) * 500;
+  const isBfg = (brand.includes('BFGOODRICH') || brand.includes('BF')) && (item.product?.sizeRim ?? 0) >= 16;
+  // Agilis follows the BF Goodrich 500-per-set rule at every rim size, not Michelin's 20%.
+  if (isBfg || model.includes('AGILIS')) {
+    // qty counts sets when isSetPricing, tires otherwise.
+    const sets = item.isSetPricing ? item.qty : item.qty / 4;
+    return total - sets * 500;
   }
+  if (brand.includes('MICHELIN')) return total * 0.8;
   return total;
 }
 
@@ -266,7 +274,7 @@ export default function QuotationPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
           <thead style={{ background: '#e5e7eb' }}>
             <tr>
-              {['No', 'ยี่ห้อ/รุ่น/ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'ส่วนลดเดือน 8', 'วิธีการชำระ'].map((h) => (
+              {['No', 'ยี่ห้อ/รุ่น/ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'รวม หลังส่วนลด', 'วิธีการชำระ'].map((h) => (
                 <th key={h} style={{ border: '1px solid #6b7280', padding: '7px 9px', whiteSpace: 'nowrap', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ/รุ่น/ขนาด' || h === 'วิธีการชำระ' ? 'left' : 'right', color: '#111', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700 }}>
                   {h}
                 </th>
@@ -319,7 +327,7 @@ export default function QuotationPage() {
                     <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{row.unitPrice.toLocaleString()}</td>
                     {spanCell(item.qty, { textAlign: 'center', fontWeight: 700 })}
                     <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>{(row.unitPrice * item.qty).toLocaleString()}</td>
-                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{promoTotal(item, row.unitPrice).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    <td style={{ border: '1px solid #6b7280', padding: '5px 9px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{promoTotal(item, row.unitPrice)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '—'}</td>
                     <td style={{ border: '1px solid #6b7280', padding: '5px 9px', color: '#374151', fontSize: '0.75rem' }}>{row.note}</td>
                   </tr>
                 );
@@ -508,7 +516,7 @@ export default function QuotationPage() {
               <th className="border px-2 py-2 text-right">ราคา/เส้น</th>
               <th className="border px-2 py-2 text-center">จำนวน</th>
               <th className="border px-2 py-2 text-right">รวม(ชุด)</th>
-              <th className="border px-2 py-2 text-right">ส่วนลดเดือน 8</th>
+              <th className="border px-2 py-2 text-right">รวม หลังส่วนลด</th>
               <th className="border px-2 py-2 text-left">วิธีการชำระ</th>
             </tr>
           </thead>
@@ -607,7 +615,7 @@ export default function QuotationPage() {
                     {(row.unitPrice * item.qty).toLocaleString()}
                   </td>
                   <td className="border px-2 py-1.5 text-right font-mono font-semibold">
-                    {promoTotal(item, row.unitPrice).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {promoTotal(item, row.unitPrice)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '-'}
                   </td>
                   <td className="border px-2 py-1.5 text-gray-600">{row.note}</td>
                 </tr>
