@@ -39,8 +39,9 @@ function promoTotal(item: any, unitPrice: number): number | null {
   const isBfg = (brand.includes('BFGOODRICH') || brand.includes('BF')) && (item.product?.sizeRim ?? 0) >= 16;
   // Agilis follows the BF Goodrich 500-per-set rule at every rim size, not Michelin's 20%.
   if (isBfg || model.includes('AGILIS')) {
-    // qty counts sets when isSetPricing, tires otherwise.
-    const sets = item.isSetPricing ? item.qty : item.qty / 4;
+    // qty counts sets when isSetPricing, tires otherwise. Floored, because the
+    // 500 is per complete set — 5 tires is one set and a spare, not 1.25 sets.
+    const sets = item.isSetPricing ? item.qty : Math.floor(item.qty / 4);
     return total - sets * 500;
   }
   if (brand.includes('MICHELIN')) return total * 0.8;
