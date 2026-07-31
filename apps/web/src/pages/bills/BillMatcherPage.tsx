@@ -32,6 +32,13 @@ export default function BillMatcherPage() {
   });
   const [importSuccess, setImportSuccess] = useState<any>(null);
 
+  // Re-reading ขายรวม into an existing batch, once the month has closed.
+  const stockInputRef = useRef<HTMLInputElement>(null);
+  const [refreshingBatchId, setRefreshingBatchId] = useState<string | null>(
+    null,
+  );
+  const [refreshResult, setRefreshResult] = useState<any>(null);
+
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: batches = [] } = useQuery<Batch[]>({
     queryKey: ['bill-batches', effectiveShopId],
@@ -104,6 +111,25 @@ export default function BillMatcherPage() {
     onSuccess: (_data, deletedId) => {
       qc.invalidateQueries({ queryKey: ['bill-batches'] });
       if (selectedBatchId === deletedId) setSelectedBatchId(null);
+    },
+  });
+
+  const refreshStock = useMutation({
+    mutationFn: ({ batchId, file }: { batchId: string; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api
+        .post(`/bill-batches/${batchId}/stock`, form)
+        .then((r) => r.data);
+    },
+    onSuccess: (data) => {
+      setRefreshResult(data);
+      qc.invalidateQueries({ queryKey: ['bill-batch'] });
+      qc.invalidateQueries({ queryKey: ['bill-suggestions'] });
+    },
+    onSettled: () => {
+      setRefreshingBatchId(null);
+      if (stockInputRef.current) stockInputRef.current.value = '';
     },
   });
 
@@ -209,6 +235,20 @@ export default function BillMatcherPage() {
                         ดู
                       </button>
                       <button
+                        onClick={() => {
+                          setRefreshResult(null);
+                          setRefreshingBatchId(batch.id);
+                          stockInputRef.current?.click();
+                        }}
+                        disabled={refreshStock.isPending}
+                        title="อ่านคอลัมน์ ขายรวม (I) ใหม่ โดยไม่แตะบิลที่จับคู่ไว้แล้ว"
+                        className="border border-gray-300 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {refreshStock.isPending && refreshingBatchId === batch.id
+                          ? 'กำลังอัปเดต...'
+                          : 'อัปเดตขายรวม'}
+                      </button>
+                      <button
                         onClick={() => deleteBatch.mutate(batch.id)}
                         disabled={deleteBatch.isPending}
                         className="bg-red-100 text-red-600 px-3 py-1 rounded text-xs hover:bg-red-200"
@@ -218,6 +258,71 @@ export default function BillMatcherPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Shared picker for "อัปเดตขายรวม" on any row above. */}
+            <input
+              ref={stockInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && refreshingBatchId) {
+                  refreshStock.mutate({ batchId: refreshingBatchId, file });
+                }
+              }}
+            />
+
+            <p className="text-xs text-gray-500 mt-3">
+              คอลัมน์ ขายรวม (I) กรอกหลังปิดเดือน — กด “อัปเดตขายรวม”
+              เพื่ออ่านค่าใหม่เข้าแบตช์เดิม บิลที่จับคู่ไว้แล้วจะไม่ถูกลบ
+            </p>
+
+            {refreshStock.isError && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                {(refreshStock.error as any)?.response?.data?.message ??
+                  'อัปเดตไม่สำเร็จ'}
+              </div>
+            )}
+
+            {refreshResult && (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-900 space-y-1">
+                <p className="font-medium">
+                  อัปเดตขายรวมแล้ว {refreshResult.updated.toLocaleString()}{' '}
+                  รายการ · รวม{' '}
+                  {refreshResult.totalSoldQty.toLocaleString()} ชิ้น
+                </p>
+                {refreshResult.missingFromFile > 0 && (
+                  <p className="text-xs text-amber-800">
+                    ⚠ {refreshResult.missingFromFile} รายการในแบตช์
+                    ไม่พบในไฟล์นี้
+                  </p>
+                )}
+                {refreshResult.unmatchedInFile > 0 && (
+                  <p className="text-xs text-amber-800">
+                    ⚠ {refreshResult.unmatchedInFile} แถวในไฟล์
+                    ไม่มีในแบตช์นี้ (สินค้าที่เพิ่มมาทีหลัง)
+                  </p>
+                )}
+                {refreshResult.overAllocated?.length > 0 && (
+                  <div className="text-xs text-red-700 pt-1">
+                    <p className="font-medium">
+                      บิลที่จับคู่ไว้ใช้เกินยอดขายจริง{' '}
+                      {refreshResult.overAllocated.length} รายการ —
+                      ตรวจสอบก่อนใช้งานต่อ
+                    </p>
+                    {refreshResult.overAllocated
+                      .slice(0, 5)
+                      .map((o: any, i: number) => (
+                        <p key={i}>
+                          · {o.description}: จับคู่ {o.matchedQty} / ขายจริง{' '}
+                          {o.soldQty}
+                        </p>
+                      ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

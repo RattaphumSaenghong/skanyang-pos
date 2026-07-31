@@ -27,6 +27,7 @@ import { BillMatcherService } from './bill-matcher.service';
 import { CloseGapDto } from './dto/close-gap.dto';
 import { ImportBillBatchDto } from './dto/import-bill-batch.dto';
 import { MatchRequestDto } from './dto/match-request.dto';
+import { RefreshStockDto } from './dto/refresh-stock.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
 
 @Controller('bill-batches')
@@ -103,6 +104,44 @@ export class BillMatcherController {
       itemFile.buffer,
       dto,
       shopId,
+    );
+  }
+
+  /**
+   * Re-read ขายรวม into an existing batch. The column is filled in after month
+   * end, long after the bills are worked, and re-importing would mean deleting
+   * the batch and every hand-matched bill with it.
+   */
+  @Post(':id/stock')
+  @Roles(Role.OWNER)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ok =
+          /\.xlsx?$/i.test(file.originalname) &&
+          [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/octet-stream',
+          ].includes(file.mimetype);
+        cb(ok ? null : new Error('Only .xls / .xlsx files are accepted'), ok);
+      },
+    }),
+  )
+  refreshStock(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: RefreshStockDto,
+    @CurrentUser() user: any,
+    @Query('shopId') shopId?: string,
+  ) {
+    if (!file) throw new BadRequestException('กรุณาเลือกไฟล์สต็อก');
+    return this.service.refreshSoldQuantities(
+      id,
+      resolveShopId(user, shopId),
+      file.buffer,
+      dto.sheet,
     );
   }
 

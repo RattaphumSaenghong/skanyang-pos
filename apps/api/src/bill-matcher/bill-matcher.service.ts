@@ -27,6 +27,7 @@ import { ImportBillBatchDto } from './dto/import-bill-batch.dto';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
 import { ServiceFeesService } from './service-fees.service';
+import { syncSoldQuantities } from './sold-quantity-sync';
 
 function firstSheetOf(buffer: Buffer): string {
   const [name] = listSheetNames(buffer);
@@ -141,6 +142,70 @@ export class BillMatcherService {
       billCount: result.billCount,
       itemCount: result.itemCount,
       warnings: result.warnings,
+    };
+  }
+
+  /**
+   * Re-read ขายรวม from the stock workbook into an existing batch.
+   *
+   * The column is filled in after the month closes, but the bills are worked
+   * long before that — so the quantities have to be able to arrive later without
+   * taking the batch with them. Re-importing can't do it (`importBatch` refuses a
+   * duplicate period, and deleting to re-import cascades away every hand-matched
+   * bill), so this updates soldQty in place and leaves bills and lines alone.
+   *
+   * Rows are paired on what identifies a SKU on the sheet — description plus
+   * price — rather than on row position, since a month's sheet gains rows as new
+   * things sell. Repeated identical rows are paired in sheet order.
+   */
+  async refreshSoldQuantities(
+    batchId: string,
+    shopId: string,
+    buffer: Buffer,
+    sheet?: string,
+  ) {
+    const batch = await this.prisma.billBatch.findFirst({
+      where: { id: batchId, shopId },
+      include: { poolItems: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!batch) throw new NotFoundException('ไม่พบใบรวมนี้');
+
+    const parsed = parseItemSheet(buffer, sheet || firstSheetOf(buffer));
+    if (parsed.items.length === 0) {
+      throw new BadRequestException(
+        'ไม่พบรายการสินค้าในชีทนี้ — ตรวจสอบหัวตาราง (ต้องมีคอลัมน์ ราคาขาย)',
+      );
+    }
+
+    const { updates, overAllocated, missingFromFile, unmatchedInFile } =
+      syncSoldQuantities(batch.poolItems, parsed.items);
+
+    // Rows sharing a quantity share one UPDATE, as in matchBatch.
+    const idsByQty = new Map<number, string[]>();
+    for (const u of updates) {
+      const bucket = idsByQty.get(u.soldQty);
+      if (bucket) bucket.push(u.id);
+      else idsByQty.set(u.soldQty, [u.id]);
+    }
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const [soldQty, ids] of idsByQty) {
+          await tx.billPoolItem.updateMany({
+            where: { id: { in: ids }, batchId },
+            data: { soldQty },
+          });
+        }
+      },
+      { timeout: 30_000 },
+    );
+
+    return {
+      updated: updates.length,
+      totalSoldQty: parsed.items.reduce((s, i) => s + i.soldQty, 0),
+      missingFromFile,
+      unmatchedInFile,
+      overAllocated,
+      warnings: parsed.warnings,
     };
   }
 
