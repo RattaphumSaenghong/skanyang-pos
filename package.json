@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "postinstall": "prisma generate",
     "seed": "ts-node --project tsconfig.base.json -r tsconfig-paths/register prisma/seed.ts",
     "dev:api": "npx nx serve api",
     "dev:web": "npx nx serve web"
