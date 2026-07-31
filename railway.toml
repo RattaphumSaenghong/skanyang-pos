@@ -8,6 +8,7 @@ dockerfilePath = "Dockerfile"
 # without ever triggering a build — the API stayed on a stale image while the
 # repo looked deployed. Anything the image is built from belongs on this list.
 watchPatterns = [
+  "railway.toml",
   "apps/**",
   "packages/**",
   "prisma/**",
