@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -22,7 +22,6 @@ interface PriceEntry {
 
 export default function PosSearchPage() {
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const isOwner = useAuthStore((s) => s.isOwner());
   const effectiveShopId = useAuthStore((s) => s.effectiveShopId());

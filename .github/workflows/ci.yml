@@ -19,11 +19,6 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
-      # This enables task distribution via Nx Cloud
-      # Run this command as early as possible, before dependencies are installed
-      # Learn more at https://nx.dev/ci/reference/nx-cloud-cli#npx-nxcloud-startcirun
-      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="e2e-ci"
-
       # Cache node_modules
       - uses: actions/setup-node@v4
         with:
@@ -32,9 +27,16 @@ jobs:
 
       - run: npm ci
 
-      # Prepend any command with "nx record --" to record its logs to Nx Cloud
-      - run: npx nx record -- npx nx format:check  --base="remotes/origin/main"
-      - run: npx nx run-many -t lint test build typecheck e2e-ci
-      # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/ci/features/self-healing-ci
-      - run: npx nx fix-ci
-        if: always()
+      - run: npx nx format:check --base="remotes/origin/main"
+
+      # `lint` currently matches no project and is a no-op. It stays listed so
+      # the target is picked up automatically once one is configured.
+      #
+      # e2e is excluded, not forgotten. Both e2e projects are untouched Nx
+      # scaffolding that has never run: api-e2e's target needs jest, which is not
+      # installed, and its spec asserts GET /api returns "Hello API"; web-e2e's
+      # only spec expects an h1 containing "Welcome" on a page that redirects to
+      # login, and no Playwright browsers are installed here. Running them would
+      # fail on the scaffolding rather than on this codebase. Drop the --exclude
+      # and add e2e-ci back once either holds a real test.
+      - run: npx nx run-many -t lint test build typecheck --exclude=@org/api-e2e

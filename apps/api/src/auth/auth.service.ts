@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { PrismaService } from '../common/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -62,7 +62,9 @@ export class AuthService {
       accessToken: this.jwt.sign(payload),
       refreshToken: this.jwt.sign(payload, {
         secret: refreshSecret,
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+        // See auth.module.ts — env-supplied ms-style literal.
+        expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ||
+          '7d') as JwtSignOptions['expiresIn'],
       }),
       user: { id: sub, username, role, shopId },
     };

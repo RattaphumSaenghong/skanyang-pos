@@ -13,11 +13,11 @@ import { Type } from 'class-transformer';
 export class CreateQuotationItemDto {
   @IsString()
   @IsNotEmpty()
-  priceEntryId: string;
+  priceEntryId!: string;
 
   @IsInt()
   @Min(1)
-  qty: number;
+  qty!: number;
 
   @IsBoolean()
   @IsOptional()
@@ -28,7 +28,7 @@ export class CreateQuotationDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateQuotationItemDto)
-  items: CreateQuotationItemDto[];
+  items!: CreateQuotationItemDto[];
 
   @IsString()
   @IsOptional()

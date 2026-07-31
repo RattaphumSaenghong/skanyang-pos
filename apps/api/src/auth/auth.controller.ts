@@ -1,5 +1,7 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+// Type-only: `Request` appears in decorated signatures, and emitDecoratorMetadata
+// under isolatedModules would otherwise emit a value reference for it.
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma/prisma.service';

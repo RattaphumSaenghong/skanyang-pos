@@ -111,7 +111,6 @@ export default function SalesReportPage() {
   const quotations = quotationsData ?? [];
   const qConverted = quotations.filter((q) => q.status === 'CONVERTED').length;
   const qCancelled = quotations.filter((q) => q.status === 'CANCELLED').length;
-  const qPending = quotations.filter((q) => q.status !== 'CONVERTED' && q.status !== 'CANCELLED').length;
   const conversionRate = quotations.length > 0 ? ((qConverted / quotations.length) * 100).toFixed(1) : '—';
 
   return (
