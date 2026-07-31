@@ -1,3 +1,19 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+
+# Kept here rather than in the dashboard so a change to the build is reviewable
+# with the change itself. The dashboard was watching only `apps/**`, so a broken
+# postinstall hook in package.json and its fix in the Dockerfile both landed
+# without ever triggering a build — the API stayed on a stale image while the
+# repo looked deployed. Anything the image is built from belongs on this list.
+watchPatterns = [
+  "apps/**",
+  "packages/**",
+  "prisma/**",
+  "Dockerfile",
+  "package.json",
+  "package-lock.json",
+  "nx.json",
+  "tsconfig.base.json",
+]
