@@ -8,11 +8,14 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
   UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   FileFieldsInterceptor,
   FileInterceptor,
@@ -148,6 +151,32 @@ export class BillMatcherController {
   @Get()
   findAll(@CurrentUser() user: any, @Query('shopId') shopId?: string) {
     return this.service.findAllBatches(resolveShopId(user, shopId));
+  }
+
+  /**
+   * The batch as a workbook. The Thai label goes in the RFC 5987 form of the
+   * header; the plain `filename` stays ASCII so older clients still get
+   * something sensible rather than mojibake.
+   */
+  @Get(':id/export')
+  @Roles(Role.OWNER)
+  async export(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Res({ passthrough: true }) res: Response,
+    @Query('shopId') shopId?: string,
+  ) {
+    const { buffer, filename, label } = await this.service.exportBatch(
+      id,
+      resolveShopId(user, shopId),
+    );
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(`${label}.xlsx`)}`,
+      'Content-Length': String(buffer.length),
+    });
+    return new StreamableFile(buffer);
   }
 
   @Get(':id')

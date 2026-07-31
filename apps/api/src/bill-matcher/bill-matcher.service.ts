@@ -26,6 +26,11 @@ import { CloseGapDto } from './dto/close-gap.dto';
 import { ImportBillBatchDto } from './dto/import-bill-batch.dto';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
+import {
+  ExportBatch,
+  buildBatchWorkbook,
+  exportFilename,
+} from './bill-export';
 import { ServiceFeesService } from './service-fees.service';
 import { syncSoldQuantities } from './sold-quantity-sync';
 
@@ -654,6 +659,43 @@ export class BillMatcherService {
     const poolById = new Map(pool.map((item) => [item.id, item]));
     const lines = closeGap(gap, contextFromLines(draft, poolById), feeInputs);
     return { gap, lines: lines ?? [] };
+  }
+
+  /** The batch as a workbook for the accountant. Read-only. */
+  async exportBatch(id: string, shopId: string) {
+    const batch = await this.prisma.billBatch.findFirst({
+      where: { id, shopId },
+      include: {
+        bills: { orderBy: { seq: 'asc' }, include: { lines: true } },
+      },
+    });
+    if (!batch) throw new NotFoundException('ไม่พบใบรวมนี้');
+
+    const data: ExportBatch = {
+      label: batch.label,
+      periodMonth: batch.periodMonth,
+      periodYear: batch.periodYear,
+      bills: batch.bills.map((b) => ({
+        seq: b.seq,
+        billDate: b.billDate,
+        amount: b.amount,
+        locked: b.locked,
+        status: b.status,
+        lines: b.lines.map((l) => ({
+          kind: l.kind,
+          description: l.description,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          lineTotal: l.lineTotal,
+        })),
+      })),
+    };
+
+    return {
+      buffer: buildBatchWorkbook(data),
+      filename: exportFilename(data),
+      label: batch.label,
+    };
   }
 
   async deleteBatch(id: string, shopId: string) {

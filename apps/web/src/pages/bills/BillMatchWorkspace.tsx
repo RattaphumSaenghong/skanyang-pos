@@ -226,6 +226,22 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
     },
   });
 
+  const exportBatch = useMutation({
+    mutationFn: async () => {
+      const res = await api.get(`/bill-batches/${batchId}/export`, {
+        responseType: 'blob',
+      });
+      // Named from the batch rather than parsed out of Content-Disposition —
+      // the label is already here and survives the Thai characters intact.
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${batch.label}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
   const toggleLock = useMutation({
     mutationFn: (bill: Bill) =>
       api
@@ -307,9 +323,19 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
         >
           {runMatch.isPending ? 'กำลังจับคู่...' : 'จับคู่อัตโนมัติทั้งชุด'}
         </button>
+        <button
+          onClick={() => exportBatch.mutate()}
+          disabled={exportBatch.isPending}
+          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {exportBatch.isPending ? 'กำลังสร้างไฟล์...' : 'ส่งออก Excel'}
+        </button>
         <span className="text-xs text-gray-500">
           เป็นตัวช่วยตั้งต้น · บิลที่ล็อกไว้จะไม่ถูกแก้
         </span>
+        {exportBatch.isError && (
+          <span className="text-xs text-red-600">ส่งออกไม่สำเร็จ</span>
+        )}
         <label className="flex items-center gap-2 text-sm ml-auto">
           <input
             type="checkbox"
