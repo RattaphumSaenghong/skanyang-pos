@@ -237,8 +237,14 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
       const a = document.createElement('a');
       a.href = url;
       a.download = `${batch.label}.xlsx`;
+      // Attached before clicking, and revoked a tick later: Firefox ignores a
+      // click on an anchor that is not in the document, and revoking the url in
+      // the same tick can pull it out from under a download that has not
+      // started yet. Chrome forgives both, so this fails on one browser only.
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     },
   });
 
