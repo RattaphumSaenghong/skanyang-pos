@@ -78,10 +78,16 @@ export default function ProductsImportPage() {
     queryKey: ['shops'],
     queryFn: () => api.get('/shops').then((r) => r.data),
     enabled: isSuperOwner,
-    onSuccess: (data: Shop[]) => { if (isSuperOwner && !bannerShopId && data[0]) setBannerShopId(data[0].id); },
-  } as any);
+  });
 
-  const effectiveBannerShopId = isOwner ? bannerShopId : (user?.shopId ?? '');
+  // Fall back to the first shop until one is picked. This used to be an
+  // `onSuccess` on the query above, which React Query v5 removed — it never ran,
+  // so the dropdown showed a shop (browsers display the first option when the
+  // value matches none) while the id stayed empty and the panel below it stayed
+  // disabled.
+  const selectedBannerShopId = bannerShopId || shops[0]?.id || '';
+
+  const effectiveBannerShopId = isOwner ? selectedBannerShopId : (user?.shopId ?? '');
 
   const { data: banners = [], refetch: refetchBanners } = useQuery<DisplayImage[]>({
     queryKey: ['banners', effectiveBannerShopId],
@@ -304,7 +310,7 @@ export default function ProductsImportPage() {
           <h3 className="text-lg font-bold">แบนเนอร์จอลูกค้า</h3>
           {isSuperOwner && shops.length > 0 && (
             <select
-              value={bannerShopId}
+              value={selectedBannerShopId}
               onChange={(e) => setBannerShopId(e.target.value)}
               className="text-sm border rounded-lg px-3 py-1.5 bg-white"
             >
