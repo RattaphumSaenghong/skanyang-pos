@@ -57,7 +57,7 @@ export class DisplayService {
     const quotation = await this.prisma.quotation.findUnique({
       where: { id: quotationId },
       include: {
-        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, isSetPricing: true, isNonPromo: true, dotYear: true, imageUrl: true } } } },
+        items: { include: { product: { select: { brand: true, model: true, sizeNormalized: true, sizeRim: true, isSetPricing: true, isNonPromo: true, dotYear: true, imageUrl: true } } } },
         customer: { select: { name: true } },
       },
     });

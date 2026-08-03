@@ -15,7 +15,7 @@ interface QuotationItem {
   discCard: number;
   discCash: number;
   discPromo: number;
-  product: { brand: string; model: string; sizeNormalized: string; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null; imageUrl: string | null };
+  product: { brand: string; model: string; sizeNormalized: string; sizeRim: number; isSetPricing: boolean; isNonPromo: boolean; dotYear?: string | null; imageUrl: string | null };
 }
 
 interface ActiveQuotation {
@@ -46,6 +46,25 @@ interface Snapshot {
 type PaymentRow = { label: string; unitPrice: number; discCard: number; discCash: number; discPromo: number; note: string };
 
 const SERVICE_PACKAGE_PRICE = 2000;
+
+// Promo only applies to a full set — 4 tires or up. null = no promo for this item.
+function promoTotal(item: QuotationItem, unitPrice: number): number | null {
+  if (!item.isSetPricing && item.qty < 4) return null;
+  const model = item.product.model.toUpperCase();
+  if (model.includes('XCD')) return null;
+  const brand = item.product.brand.toUpperCase();
+  const total = unitPrice * item.qty;
+  const isBfg = (brand.includes('BFGOODRICH') || brand.includes('BF')) && item.product.sizeRim >= 16;
+  // Agilis follows the BF Goodrich 500-per-set rule at every rim size, not Michelin's 20%.
+  if (isBfg || model.includes('AGILIS')) {
+    // qty counts sets when isSetPricing, tires otherwise. Floored, because the
+    // 500 is per complete set — 5 tires is one set and a spare, not 1.25 sets.
+    const sets = item.isSetPricing ? item.qty : Math.floor(item.qty / 4);
+    return total - sets * 500;
+  }
+  if (brand.includes('MICHELIN')) return total * 0.8;
+  return total;
+}
 
 function buildPaymentRows(item: QuotationItem): PaymentRow[] {
   if (!item.isSetPricing && item.qty % 4 !== 0) {
@@ -308,7 +327,7 @@ export default function CustomerDisplayPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead style={{ background: '#f9fafb' }}>
             <tr>
-              {['No', 'รูป', 'ยี่ห้อ / รุ่น / ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'วิธีการชำระ'].map((h) => (
+              {['No', 'รูป', 'ยี่ห้อ / รุ่น / ขนาด', 'ราคาปกติ', 'ลดยางเก่า', 'ลดบัตร/ลดสด', 'ลดโปรฯ', 'ราคา/เส้น', 'จำนวน', 'รวม(ชุด)', 'รวม หลังส่วนลด', 'วิธีการชำระ'].map((h) => (
                 <th key={h} style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: h === 'No' || h === 'จำนวน' ? 'center' : h === 'ยี่ห้อ / รุ่น / ขนาด' || h === 'วิธีการชำระ' ? 'left' : 'right', color: '#6b7280', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
                   {h}
                 </th>
@@ -374,6 +393,9 @@ export default function CustomerDisplayPage() {
                   <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: rowIdx === rows.length - 1 ? '#15803d' : '#111' }}>
                     {(row.unitPrice * item.qty).toLocaleString()}
                   </td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
+                    {promoTotal(item, row.unitPrice)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '—'}
+                  </td>
                   <td style={{ border: '1px solid #e5e7eb', padding: '6px 10px', color: '#6b7280', fontSize: '0.82rem' }}>{row.note}</td>
                 </tr>
               ));
@@ -391,6 +413,7 @@ export default function CustomerDisplayPage() {
                 <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right' }}>—</td>
                 <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{SERVICE_PACKAGE_PRICE.toLocaleString()}</td>
                 <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>1</td>
+                <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
                 <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>0</td>
                 <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#6b7280' }}>แถมฟรี</td>
               </tr>
