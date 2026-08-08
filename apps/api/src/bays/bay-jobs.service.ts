@@ -193,21 +193,30 @@ export class BayJobsService {
     let services: ResolvedService[] | null = null;
     if (dto.services) {
       services = await this.resolveServices(dto.services, shopId);
-      const estimatedMinutes = this.totalMinutes(services);
-      updateData.estimatedMinutes = estimatedMinutes;
+      updateData.estimatedMinutes = this.totalMinutes(services);
+    }
 
-      // Changing the services changes when this booking ends, so it has to be
-      // re-checked against its neighbours — a longer job can grow into the next
-      // booking's slot.
-      if (job.status === BayJobStatus.BOOKED && job.bayId && job.scheduledAt) {
-        await this.assertNoBookingClash(
-          job.bayId,
-          shopId,
-          job.scheduledAt,
-          estimatedMinutes,
-          job.id,
-        );
+    let scheduledAt: Date | undefined;
+    if (dto.scheduledAt !== undefined) {
+      // Requeuing a time only makes sense while the car hasn't checked in yet.
+      if (job.status !== BayJobStatus.BOOKED) {
+        throw new BadRequestException('แก้ไขเวลาจองได้เฉพาะคิวที่ยังไม่เช็คอิน');
       }
+      scheduledAt = new Date(dto.scheduledAt);
+      updateData.scheduledAt = scheduledAt;
+    }
+
+    // Changing the services or the time changes when this booking occupies its
+    // bay, so it has to be re-checked against its neighbours — a longer job,
+    // or a job moved later, can grow into the next booking's slot.
+    if (job.status === BayJobStatus.BOOKED && job.bayId && (services || scheduledAt)) {
+      await this.assertNoBookingClash(
+        job.bayId,
+        shopId,
+        scheduledAt ?? job.scheduledAt!,
+        updateData.estimatedMinutes ?? job.estimatedMinutes,
+        job.id,
+      );
     }
 
     // Replacing the services is a delete followed by a create; without the

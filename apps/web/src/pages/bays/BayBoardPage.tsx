@@ -77,6 +77,13 @@ type SelectedService = { serviceId?: string; name: string; minutes: number };
 const timeOf = (iso: string) =>
   new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
+// datetime-local wants local wall-clock time, not UTC.
+const toDatetimeLocal = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const localDateString = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -438,6 +445,7 @@ function AddJobModal({
               <label className="mb-1 block text-xs font-medium text-gray-600">เวลาจอง *</label>
               <input
                 type="datetime-local"
+                step={900}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
                 value={form.scheduledAt}
                 onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
@@ -497,6 +505,8 @@ export default function BayBoardPage() {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [bookingDate, setBookingDate] = useState(() => localDateString(new Date()));
   const [error, setError] = useState<string | null>(null);
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [editScheduledAt, setEditScheduledAt] = useState('');
 
   const {
     data: board,
@@ -665,6 +675,18 @@ export default function BayBoardPage() {
       api.post(`/bay-jobs/${id}/cancel`, { noShow: false }, { params: scope }),
     ),
   );
+
+  const requeueBooking = useMutation({
+    mutationFn: ({ id, scheduledAt }: { id: string; scheduledAt: string }) =>
+      api.patch(`/bay-jobs/${id}`, { scheduledAt: new Date(scheduledAt).toISOString() }, { params: scope }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bay-bookings'] });
+      qc.invalidateQueries({ queryKey: ['bay-board'] });
+      setEditingBookingId(null);
+      setError(null);
+    },
+    onError: (err: any) => setError(errMessage(err)),
+  });
 
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-400">กำลังโหลด...</div>;
@@ -879,7 +901,45 @@ export default function BayBoardPage() {
                 {bookings.map((b) => (
                   <tr key={b.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium tabular-nums">
-                      {timeOf(b.scheduledAt)}
+                      {editingBookingId === b.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="datetime-local"
+                            step={900}
+                            autoFocus
+                            className="rounded-lg border px-2 py-1 text-sm"
+                            value={editScheduledAt}
+                            onChange={(e) => setEditScheduledAt(e.target.value)}
+                          />
+                          <button
+                            onClick={() =>
+                              requeueBooking.mutate({ id: b.id, scheduledAt: editScheduledAt })
+                            }
+                            disabled={!editScheduledAt || requeueBooking.isPending}
+                            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-40"
+                          >
+                            บันทึก
+                          </button>
+                          <button
+                            onClick={() => setEditingBookingId(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setError(null);
+                            setEditingBookingId(b.id);
+                            setEditScheduledAt(toDatetimeLocal(b.scheduledAt));
+                          }}
+                          className="hover:underline"
+                          title="แก้ไขเวลาจอง"
+                        >
+                          {timeOf(b.scheduledAt)}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-medium">{b.plateNumber}</td>
                     <td className="px-4 py-3 text-gray-500">{b.customerName ?? '—'}</td>

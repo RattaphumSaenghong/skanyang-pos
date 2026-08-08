@@ -5,6 +5,7 @@ import {
   IsInt,
   Min,
   ArrayNotEmpty,
+  IsISO8601,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -43,6 +44,10 @@ export class UpdateBayJobDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  scheduledAt?: string;
 
   @IsOptional()
   @ValidateNested({ each: true })
