@@ -35,6 +35,9 @@ interface WaitingJob {
   kind: 'WALK_IN' | 'BOOKING';
   plateNumber: string;
   customerName: string | null;
+  phone: string | null;
+  vehicleModel: string | null;
+  note: string | null;
   services: Service[];
   estimatedMinutes: number;
   queuedAt: string | null;
@@ -47,6 +50,10 @@ interface Booking {
   id: string;
   plateNumber: string;
   customerName: string | null;
+  phone: string | null;
+  vehicleModel: string | null;
+  note: string | null;
+  services: Service[];
   scheduledAt: string;
   bayId: string | null;
   status: string;
@@ -492,6 +499,84 @@ function AddJobModal({
   );
 }
 
+// ── Queue details overlay ───────────────────────────────────────────────────────
+
+interface QueueDetails {
+  plateNumber: string;
+  customerName: string | null;
+  phone: string | null;
+  vehicleModel: string | null;
+  note: string | null;
+  services: Service[];
+  estimatedMinutes: number;
+  timeLabel: string;
+  bayName: string | null;
+}
+
+function QueueDetailsOverlay({ data, onClose }: { data: QueueDetails; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold">{data.plateNumber}</h3>
+            {data.customerName && <p className="text-sm text-gray-500">{data.customerName}</p>}
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">เบอร์โทรศัพท์</span>
+            <span>{data.phone || '—'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">รุ่นรถ</span>
+            <span>{data.vehicleModel || '—'}</span>
+          </div>
+          {data.bayName && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">ช่องบริการ</span>
+              <span>{data.bayName}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-gray-500">{data.bayName ? 'เวลา' : 'สถานะ'}</span>
+            <span>{data.timeLabel}</span>
+          </div>
+        </div>
+
+        {data.note && (
+          <div className="mt-3 rounded-lg bg-gray-50 p-2 text-sm text-gray-600">{data.note}</div>
+        )}
+
+        <div className="mt-4">
+          <p className="mb-1 text-xs font-medium text-gray-600">บริการ</p>
+          <div className="flex flex-wrap gap-1.5">
+            {data.services.map((s, i) => (
+              <span key={i} className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                {s.name} · {s.minutes} นาที
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-right text-xs text-gray-400 tabular-nums">
+            รวม {data.estimatedMinutes} นาที
+          </p>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          ปิด
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function BayBoardPage() {
@@ -507,6 +592,7 @@ export default function BayBoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [editScheduledAt, setEditScheduledAt] = useState('');
+  const [queueDetails, setQueueDetails] = useState<QueueDetails | null>(null);
 
   const {
     data: board,
@@ -799,9 +885,27 @@ export default function BayBoardPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-gray-900">
+                    <button
+                      onClick={() =>
+                        setQueueDetails({
+                          plateNumber: job.plateNumber,
+                          customerName: job.customerName,
+                          phone: job.phone,
+                          vehicleModel: job.vehicleModel,
+                          note: job.note,
+                          services: job.services,
+                          estimatedMinutes: job.estimatedMinutes,
+                          timeLabel:
+                            job.kind === 'BOOKING' && job.scheduledAt
+                              ? `จอง ${timeOf(job.scheduledAt)}`
+                              : `รอคิว ${job.waitingMinutes} นาที`,
+                          bayName: null,
+                        })
+                      }
+                      className="text-base font-bold text-gray-900 hover:underline"
+                    >
                       {job.plateNumber}
-                    </span>
+                    </button>
                     {job.kind === 'BOOKING' && job.scheduledAt && (
                       <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-700">
                         จอง {timeOf(job.scheduledAt)}
@@ -941,7 +1045,26 @@ export default function BayBoardPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium">{b.plateNumber}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <button
+                        onClick={() =>
+                          setQueueDetails({
+                            plateNumber: b.plateNumber,
+                            customerName: b.customerName,
+                            phone: b.phone,
+                            vehicleModel: b.vehicleModel,
+                            note: b.note,
+                            services: b.services,
+                            estimatedMinutes: b.estimatedMinutes,
+                            timeLabel: timeOf(b.scheduledAt),
+                            bayName: board.bays.find((x) => x.id === b.bayId)?.name ?? '—',
+                          })
+                        }
+                        className="hover:underline"
+                      >
+                        {b.plateNumber}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{b.customerName ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500">
                       {board.bays.find((x) => x.id === b.bayId)?.name ?? '—'}
@@ -987,6 +1110,10 @@ export default function BayBoardPage() {
           isPending={createJob.isPending}
           error={error}
         />
+      )}
+
+      {queueDetails && (
+        <QueueDetailsOverlay data={queueDetails} onClose={() => setQueueDetails(null)} />
       )}
     </div>
   );
