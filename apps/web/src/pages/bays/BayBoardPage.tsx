@@ -91,6 +91,72 @@ const toDatetimeLocal = (iso: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const BOOKING_HOURS = Array.from({ length: 10 }, (_, h) => String(h + 8).padStart(2, '0'));
+const MINUTE_STEPS = ['00', '15', '30', '45'];
+
+// A native <input type="datetime-local"> hands its dropdown UI to the OS —
+// AM/PM vs 24h and the minute list it offers are outside our control there.
+// Separate selects give us both: 24h always, and only :00/:15/:30/:45.
+function DateTimeStepPicker({
+  value,
+  onChange,
+}: {
+  value: string; // '' or 'YYYY-MM-DDTHH:mm'
+  onChange: (value: string) => void;
+}) {
+  const [initialDate, initialTime] = value ? value.split('T') : ['', ''];
+  const [initialHour, initialMinute] = initialTime ? initialTime.split(':') : ['', ''];
+
+  // Local state so a partial pick (date only, say) stays visible instead of
+  // bouncing back to blank — onChange only reports upward once all three
+  // parts are in, but the fields themselves must remember each other's picks.
+  const [date, setDate] = useState(initialDate);
+  const [hour, setHour] = useState(initialHour);
+  const [minute, setMinute] = useState(initialMinute);
+
+  const commit = (nextDate: string, nextHour: string, nextMinute: string) => {
+    setDate(nextDate);
+    setHour(nextHour);
+    setMinute(nextMinute);
+    onChange(nextDate && nextHour && nextMinute ? `${nextDate}T${nextHour}:${nextMinute}` : '');
+  };
+
+  return (
+    <div className="flex gap-1.5">
+      <input
+        type="date"
+        className="rounded-lg border px-2 py-2 text-sm"
+        value={date}
+        onChange={(e) => commit(e.target.value, hour, minute)}
+      />
+      <select
+        className="rounded-lg border px-2 py-2 text-sm"
+        value={hour}
+        onChange={(e) => commit(date, e.target.value, minute)}
+      >
+        <option value="">ชม.</option>
+        {BOOKING_HOURS.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <select
+        className="rounded-lg border px-2 py-2 text-sm"
+        value={minute}
+        onChange={(e) => commit(date, hour, e.target.value)}
+      >
+        <option value="">นาที</option>
+        {MINUTE_STEPS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 const localDateString = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -450,12 +516,9 @@ function AddJobModal({
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">เวลาจอง *</label>
-              <input
-                type="datetime-local"
-                step={900}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+              <DateTimeStepPicker
                 value={form.scheduledAt}
-                onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                onChange={(v) => setForm((f) => ({ ...f, scheduledAt: v }))}
               />
             </div>
             <div>
@@ -1007,14 +1070,7 @@ export default function BayBoardPage() {
                     <td className="px-4 py-3 font-medium tabular-nums">
                       {editingBookingId === b.id ? (
                         <div className="flex items-center gap-1.5">
-                          <input
-                            type="datetime-local"
-                            step={900}
-                            autoFocus
-                            className="rounded-lg border px-2 py-1 text-sm"
-                            value={editScheduledAt}
-                            onChange={(e) => setEditScheduledAt(e.target.value)}
-                          />
+                          <DateTimeStepPicker value={editScheduledAt} onChange={setEditScheduledAt} />
                           <button
                             onClick={() =>
                               requeueBooking.mutate({ id: b.id, scheduledAt: editScheduledAt })

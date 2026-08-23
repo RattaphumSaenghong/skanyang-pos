@@ -7,6 +7,7 @@ import {
   Bill,
   DraftLine,
   PoolItem,
+  ServiceFee,
   Suggestion,
   itemLabel,
 } from './types';
@@ -24,6 +25,7 @@ import {
 interface Props {
   batchId: string;
   batch: BatchDetail;
+  shopId: string;
 }
 
 const toDraft = (lines: Bill['lines']): DraftLine[] =>
@@ -50,7 +52,7 @@ const LINE_STYLE: Record<DraftLine['kind'], string> = {
   FREEFORM: 'bg-red-50 text-red-800',
 };
 
-export default function BillMatchWorkspace({ batchId, batch }: Props) {
+export default function BillMatchWorkspace({ batchId, batch, shopId }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -164,10 +166,25 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
     queryKey: ['bill-suggestions', batchId, openBillId],
     queryFn: () =>
       api
-        .get(`/bill-batches/${batchId}/bills/${openBillId}/suggestions`)
+        .get(
+          `/bill-batches/${batchId}/bills/${openBillId}/suggestions?shopId=${shopId}`,
+        )
         .then((r) => r.data),
     enabled: !!openBillId,
   });
+
+  const { data: serviceFees = [] } = useQuery<ServiceFee[]>({
+    queryKey: ['service-fees', shopId],
+    queryFn: () =>
+      api.get(`/service-fees?shopId=${shopId}`).then((r) => r.data),
+  });
+  const activeFees = useMemo(
+    () =>
+      serviceFees
+        .filter((f) => f.active)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [serviceFees],
+  );
 
   const invalidateBatch = () => {
     qc.invalidateQueries({ queryKey: ['bill-batch', batchId] });
@@ -177,7 +194,9 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
   const runMatch = useMutation({
     mutationFn: () =>
       api
-        .post(`/bill-batches/${batchId}/match`, { timeBudgetMs: 3000 })
+        .post(`/bill-batches/${batchId}/match?shopId=${shopId}`, {
+          timeBudgetMs: 3000,
+        })
         .then((r) => r.data),
     onSuccess: invalidateBatch,
   });
@@ -185,9 +204,10 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
   const fillGap = useMutation({
     mutationFn: () =>
       api
-        .post(`/bill-batches/${batchId}/bills/${openBillId}/close-gap`, {
-          lines: draft,
-        })
+        .post(
+          `/bill-batches/${batchId}/bills/${openBillId}/close-gap?shopId=${shopId}`,
+          { lines: draft },
+        )
         .then((r) => r.data as { gap: number; lines: DraftLine[] }),
     onSuccess: (data) => {
       if (data.lines.length) {
@@ -212,12 +232,15 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
   const saveBill = useMutation({
     mutationFn: () =>
       api
-        .patch(`/bill-batches/${batchId}/bills/${openBillId}`, {
-          lines: draft,
-          // Hand-matched bills are locked, or the next auto-match run would
-          // delete these lines and reassign the stock.
-          locked: true,
-        })
+        .patch(
+          `/bill-batches/${batchId}/bills/${openBillId}?shopId=${shopId}`,
+          {
+            lines: draft,
+            // Hand-matched bills are locked, or the next auto-match run would
+            // delete these lines and reassign the stock.
+            locked: true,
+          },
+        )
         .then((r) => r.data),
     onSuccess: () => {
       invalidateBatch();
@@ -228,9 +251,10 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
 
   const exportBatch = useMutation({
     mutationFn: async () => {
-      const res = await api.get(`/bill-batches/${batchId}/export`, {
-        responseType: 'blob',
-      });
+      const res = await api.get(
+        `/bill-batches/${batchId}/export?shopId=${shopId}`,
+        { responseType: 'blob' },
+      );
       // Named from the batch rather than parsed out of Content-Disposition —
       // the label is already here and survives the Thai characters intact.
       const url = URL.createObjectURL(res.data as Blob);
@@ -251,7 +275,7 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
   const toggleLock = useMutation({
     mutationFn: (bill: Bill) =>
       api
-        .patch(`/bill-batches/${batchId}/bills/${bill.id}`, {
+        .patch(`/bill-batches/${batchId}/bills/${bill.id}?shopId=${shopId}`, {
           locked: !bill.locked,
         })
         .then((r) => r.data),
@@ -292,6 +316,34 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
           qty: 1,
           unitPrice: item.unitPrice,
           lineTotal: item.unitPrice,
+        },
+      ];
+    });
+  };
+
+  /** Services aren't stock, so there's no shared ceiling — just the fee's own maxQty. */
+  const addService = (fee: ServiceFee) => {
+    if (!openBill) return;
+    setDraft((d) => {
+      const at = d.findIndex(
+        (l) => l.kind === 'SERVICE' && l.serviceFeeId === fee.id,
+      );
+      if (at >= 0) {
+        if (d[at].qty >= fee.maxQty) return d;
+        const next = [...d];
+        const qty = next[at].qty + 1;
+        next[at] = { ...next[at], qty, lineTotal: qty * next[at].unitPrice };
+        return next;
+      }
+      return [
+        ...d,
+        {
+          kind: 'SERVICE',
+          serviceFeeId: fee.id,
+          description: fee.name,
+          qty: 1,
+          unitPrice: fee.minPrice,
+          lineTotal: fee.minPrice,
         },
       ];
     });
@@ -353,107 +405,162 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
       </div>
 
       <div className="grid lg:grid-cols-5 gap-4 items-start">
-        {/* ── Left: what was sold ── */}
-        <div className="lg:col-span-2 bg-white rounded-xl border lg:sticky lg:top-4">
-          <div className="p-4 border-b space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="font-medium">สินค้าที่ขาย</p>
-              {unconstrained ? (
-                <p className="text-xs text-gray-500">
-                  {batch.poolItems.length.toLocaleString()} รายการในสต็อก
+        {/* ── Left: what was sold, and the services that can go with it ── */}
+        <div className="lg:col-span-2 space-y-4 lg:sticky lg:top-4">
+          <div className="bg-white rounded-xl border">
+            <div className="p-4 border-b space-y-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="font-medium">สินค้าที่ขาย</p>
+                {unconstrained ? (
+                  <p className="text-xs text-gray-500">
+                    {batch.poolItems.length.toLocaleString()} รายการในสต็อก
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    จับคู่แล้ว {totalMatched.toLocaleString()} /{' '}
+                    {totalSold.toLocaleString()} ชิ้น
+                  </p>
+                )}
+              </div>
+              {unconstrained && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  ไฟล์สต็อกนี้ไม่ได้กรอกคอลัมน์ ขายรวม (I)
+                  ระบบจึงไม่จำกัดจำนวนต่อรายการ — เลือกสินค้าได้ทุกตัว
+                </p>
+              )}
+              <input
+                type="text"
+                placeholder="ค้นหาสินค้า..."
+                value={itemQuery}
+                onChange={(e) => setItemQuery(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+              <div className="flex items-center justify-between">
+                {unconstrained ? (
+                  <span />
+                ) : (
+                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={onlyRemaining}
+                      onChange={(e) => setOnlyRemaining(e.target.checked)}
+                    />
+                    เฉพาะที่ยังเหลือ
+                  </label>
+                )}
+                <p className="text-xs text-gray-400">
+                  {filteredPool.length} รายการ
+                </p>
+              </div>
+              <p className="text-xs text-gray-500">
+                {openBill
+                  ? `กดสินค้าเพื่อใส่ในบิล ${String(openBill.seq).padStart(3, '0')}`
+                  : 'เลือกบิลด้านขวาก่อน แล้วกดสินค้าเพื่อใส่ในบิล'}
+              </p>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto divide-y">
+              {filteredPool.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  ไม่มีรายการ
                 </p>
               ) : (
-                <p className="text-xs text-gray-500">
-                  จับคู่แล้ว {totalMatched.toLocaleString()} /{' '}
-                  {totalSold.toLocaleString()} ชิ้น
+                filteredPool.slice(0, POOL_RENDER_CAP).map((item) => {
+                  const left = remaining.get(item.id) ?? 0;
+                  const pickable = !!openBill && (unconstrained || left > 0);
+                  const dim = !unconstrained && left <= 0;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => addItem(item)}
+                      disabled={!pickable}
+                      className={`w-full text-left px-4 py-2.5 flex items-center gap-3 ${
+                        pickable
+                          ? 'hover:bg-blue-50 cursor-pointer'
+                          : 'cursor-default'
+                      } ${dim ? 'opacity-40' : ''}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{itemLabel(item)}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.unitPrice.toLocaleString()} ฿/ชิ้น
+                        </p>
+                      </div>
+                      {!unconstrained && (
+                        <span
+                          className={`text-xs font-medium px-2 py-1 rounded whitespace-nowrap ${
+                            left > 0
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          เหลือ {left} / {item.soldQty}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+              {filteredPool.length > POOL_RENDER_CAP && (
+                <p className="text-xs text-gray-500 text-center py-3">
+                  แสดง {POOL_RENDER_CAP} จาก{' '}
+                  {filteredPool.length.toLocaleString()} รายการ — ใช้ช่องค้นหา
                 </p>
               )}
             </div>
-            {unconstrained && (
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                ไฟล์สต็อกนี้ไม่ได้กรอกคอลัมน์ ขายรวม (I)
-                ระบบจึงไม่จำกัดจำนวนต่อรายการ — เลือกสินค้าได้ทุกตัว
-              </p>
-            )}
-            <input
-              type="text"
-              placeholder="ค้นหาสินค้า..."
-              value={itemQuery}
-              onChange={(e) => setItemQuery(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            />
-            <div className="flex items-center justify-between">
-              {unconstrained ? (
-                <span />
-              ) : (
-                <label className="flex items-center gap-2 text-xs text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={onlyRemaining}
-                    onChange={(e) => setOnlyRemaining(e.target.checked)}
-                  />
-                  เฉพาะที่ยังเหลือ
-                </label>
-              )}
-              <p className="text-xs text-gray-400">
-                {filteredPool.length} รายการ
-              </p>
-            </div>
-            <p className="text-xs text-gray-500">
-              {openBill
-                ? `กดสินค้าเพื่อใส่ในบิล ${String(openBill.seq).padStart(3, '0')}`
-                : 'เลือกบิลด้านขวาก่อน แล้วกดสินค้าเพื่อใส่ในบิล'}
-            </p>
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto divide-y">
-            {filteredPool.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">
-                ไม่มีรายการ
+          {/* ── Services: not stock, so no remaining count — just the fee's own maxQty ── */}
+          <div className="bg-white rounded-xl border">
+            <div className="p-4 border-b">
+              <p className="font-medium">บริการ</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {openBill
+                  ? `กดบริการเพื่อใส่ในบิล ${String(openBill.seq).padStart(3, '0')}`
+                  : 'เลือกบิลด้านขวาก่อน แล้วกดบริการเพื่อใส่ในบิล'}
               </p>
-            ) : (
-              filteredPool.slice(0, POOL_RENDER_CAP).map((item) => {
-                const left = remaining.get(item.id) ?? 0;
-                const pickable = !!openBill && (unconstrained || left > 0);
-                const dim = !unconstrained && left <= 0;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => addItem(item)}
-                    disabled={!pickable}
-                    className={`w-full text-left px-4 py-2.5 flex items-center gap-3 ${
-                      pickable
-                        ? 'hover:bg-blue-50 cursor-pointer'
-                        : 'cursor-default'
-                    } ${dim ? 'opacity-40' : ''}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{itemLabel(item)}</p>
-                      <p className="text-xs text-gray-500">
-                        {item.unitPrice.toLocaleString()} ฿/ชิ้น
-                      </p>
-                    </div>
-                    {!unconstrained && (
-                      <span
-                        className={`text-xs font-medium px-2 py-1 rounded whitespace-nowrap ${
-                          left > 0
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        เหลือ {left} / {item.soldQty}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-            {filteredPool.length > POOL_RENDER_CAP && (
-              <p className="text-xs text-gray-500 text-center py-3">
-                แสดง {POOL_RENDER_CAP} จาก{' '}
-                {filteredPool.length.toLocaleString()} รายการ — ใช้ช่องค้นหา
-              </p>
-            )}
+            </div>
+            <div className="divide-y">
+              {activeFees.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  ไม่มีบริการ
+                </p>
+              ) : (
+                activeFees.map((fee) => {
+                  const qtyInDraft =
+                    draft.find(
+                      (l) => l.kind === 'SERVICE' && l.serviceFeeId === fee.id,
+                    )?.qty ?? 0;
+                  const pickable = !!openBill && qtyInDraft < fee.maxQty;
+                  return (
+                    <button
+                      key={fee.id}
+                      onClick={() => addService(fee)}
+                      disabled={!pickable}
+                      className={`w-full text-left px-4 py-2.5 flex items-center gap-3 ${
+                        pickable
+                          ? 'hover:bg-emerald-50 cursor-pointer'
+                          : 'cursor-default'
+                      } ${qtyInDraft >= fee.maxQty ? 'opacity-40' : ''}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{fee.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {fee.minPrice === fee.maxPrice
+                            ? `${fee.minPrice.toLocaleString()} ฿`
+                            : `${fee.minPrice.toLocaleString()}–${fee.maxPrice.toLocaleString()} ฿`}
+                        </p>
+                      </div>
+                      {qtyInDraft > 0 && (
+                        <span className="text-xs font-medium px-2 py-1 rounded whitespace-nowrap bg-emerald-100 text-emerald-800">
+                          ใส่แล้ว ×{qtyInDraft}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
@@ -629,7 +736,9 @@ export default function BillMatchWorkspace({ batchId, batch }: Props) {
                           disabled={saveBill.isPending}
                           className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs disabled:opacity-50"
                         >
-                          {saveBill.isPending ? 'กำลังบันทึก...' : 'บันทึกและล็อก'}
+                          {saveBill.isPending
+                            ? 'กำลังบันทึก...'
+                            : 'บันทึกและล็อก'}
                         </button>
                       </div>
                     </div>

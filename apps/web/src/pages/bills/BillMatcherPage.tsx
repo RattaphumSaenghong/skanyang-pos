@@ -566,6 +566,7 @@ export default function BillMatcherPage() {
               <BillMatchWorkspace
                 batchId={selectedBatchId}
                 batch={batchDetail}
+                shopId={effectiveShopId!}
               />
             </>
           ) : (
