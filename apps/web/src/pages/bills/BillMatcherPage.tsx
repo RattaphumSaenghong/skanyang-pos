@@ -50,8 +50,10 @@ export default function BillMatcherPage() {
   const { data: batchDetail } = useQuery<BatchDetail>({
     queryKey: ['bill-batch', selectedBatchId],
     queryFn: () =>
-      api.get(`/bill-batches/${selectedBatchId}`).then((r) => r.data),
-    enabled: !!selectedBatchId,
+      api
+        .get(`/bill-batches/${selectedBatchId}?shopId=${effectiveShopId}`)
+        .then((r) => r.data),
+    enabled: !!selectedBatchId && !!effectiveShopId,
   });
 
   const { data: serviceFees = [] } = useQuery<ServiceFee[]>({
