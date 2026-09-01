@@ -106,7 +106,7 @@ export default function BayReportsPage() {
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">ประวัติงานช่องบริการ</h2>
 
-      <div className="bg-white rounded-xl border p-4 mb-4 grid grid-cols-4 gap-4">
+      <div className="bg-white rounded-xl border p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-xs text-gray-500 mb-1">วันที่เริ่มต้น</label>
           <input
@@ -152,7 +152,7 @@ export default function BayReportsPage() {
         <>
           {stats && (
             <>
-              <div className="grid grid-cols-6 gap-3 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                 <div className="bg-white rounded-xl border p-4">
                   <p className="text-xs text-gray-500">เสร็จสิ้น</p>
                   <p className="text-2xl font-bold text-green-700">{stats.completedJobs}</p>
@@ -193,7 +193,7 @@ export default function BayReportsPage() {
             </>
           )}
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>

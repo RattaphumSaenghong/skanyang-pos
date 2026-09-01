@@ -172,7 +172,7 @@ export default function SalesReportPage() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
               { label: 'ทั้งหมด', value: quotations.length, cls: 'text-gray-700' },
               { label: 'แปลงเป็นขาย', value: qConverted, cls: 'text-green-600' },
@@ -209,7 +209,7 @@ function QuotationTable({ quotations, onCancel, cancellingId }: {
   cancellingId?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
+    <div className="bg-white rounded-xl border overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
           <tr>
@@ -275,7 +275,7 @@ function SalesTable({
   const colSpan = showFlags ? 8 : 6;
 
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
+    <div className="bg-white rounded-xl border overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
           <tr>

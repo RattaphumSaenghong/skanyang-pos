@@ -249,7 +249,7 @@ export default function StockDashboardPage() {
                 </span>
               )}
             </div>
-            <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="bg-white rounded-xl border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
                   <tr>

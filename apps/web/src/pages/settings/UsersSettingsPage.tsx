@@ -170,7 +170,7 @@ export default function UsersSettingsPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
@@ -299,7 +299,7 @@ export default function UsersSettingsPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="bg-white rounded-xl border overflow-x-auto">
                 {ipList.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-gray-400 text-center">ยังไม่มี IP (ทุกคนเข้าได้)</p>
                 ) : (
@@ -410,7 +410,7 @@ export default function UsersSettingsPage() {
             </div>
             {promoShopId && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Michelin</label>
                     <textarea

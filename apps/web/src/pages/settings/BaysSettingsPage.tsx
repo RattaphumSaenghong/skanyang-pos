@@ -233,7 +233,7 @@ export default function BaysSettingsPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             {baysLoading ? (
               <p className="px-4 py-6 text-sm text-gray-400 text-center">กำลังโหลด...</p>
             ) : sortedBays.length === 0 ? (
@@ -407,7 +407,7 @@ export default function BaysSettingsPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             {servicesLoading ? (
               <p className="px-4 py-6 text-sm text-gray-400 text-center">กำลังโหลด...</p>
             ) : sortedServices.length === 0 ? (

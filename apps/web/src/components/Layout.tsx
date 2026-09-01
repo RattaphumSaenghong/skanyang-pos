@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/auth.store';
@@ -25,6 +25,8 @@ const ownerItems = [
 export default function Layout() {
   const { user, logout, isOwner, isSuperOwner, setSelectedShopId } = useAuthStore();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = () => setSidebarOpen(false);
 
   const { data: shops = [] } = useQuery<Shop[]>({
     queryKey: ['shops'],
@@ -56,7 +58,15 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <aside className="w-56 bg-white border-r flex flex-col">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={closeSidebar} />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-56 flex-col bg-white border-r
+          transform transition-transform duration-200 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:static lg:translate-x-0`}
+      >
         <div className="p-4 border-b">
           <p className="font-bold text-lg">{selectedShop?.name ?? 'POS'}</p>
           <p className="text-xs text-gray-500">{user?.username} · {user?.role === 'OWNER' ? 'Super Admin' : user?.role === 'SHOP_OWNER' ? 'เจ้าของร้าน' : 'พนักงาน'}</p>
@@ -80,6 +90,7 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={closeSidebar}
               className={({ isActive }) =>
                 `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
@@ -94,6 +105,7 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={closeSidebar}
               className={({ isActive }) =>
                 `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
@@ -121,9 +133,21 @@ export default function Layout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-3 border-b bg-white p-3 lg:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="เปิดเมนู"
+            className="rounded-lg p-3 -ml-1 text-xl leading-none hover:bg-gray-100 active:bg-gray-200"
+          >
+            ☰
+          </button>
+          <p className="truncate font-bold text-base">{selectedShop?.name ?? 'POS'}</p>
+        </header>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

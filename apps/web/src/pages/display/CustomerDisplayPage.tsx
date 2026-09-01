@@ -295,7 +295,7 @@ export default function CustomerDisplayPage() {
     }}>
       <div style={{
         background: '#fff', borderRadius: 16, padding: '2rem 2.5rem',
-        width: '100%', maxWidth: 1000, maxHeight: '92vh', overflowY: 'auto',
+        width: '100%', maxWidth: 'min(1000px, 90vw)', maxHeight: '92vh', overflowY: 'auto',
         boxShadow: '0 8px 40px rgba(0,0,0,0.5)', position: 'relative',
       }}>
         <button

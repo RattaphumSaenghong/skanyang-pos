@@ -15,7 +15,7 @@ export default function MarginsReportPage() {
     <div className="p-6">
       <h2 className="text-xl font-bold mb-4">รายงานกำไร</h2>
       {isLoading ? <p className="text-gray-400">กำลังโหลด...</p> : (
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>

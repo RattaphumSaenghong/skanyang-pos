@@ -421,7 +421,7 @@ function AddJobModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {field('ทะเบียนรถ *', 'plateNumber', 'เช่น กท 1234')}
           {field('ชื่อลูกค้า', 'customerName', 'ไม่บังคับ')}
           {field('เบอร์โทรศัพท์', 'phone', 'ไม่บังคับ')}
@@ -513,7 +513,7 @@ function AddJobModal({
         </div>
 
         {mode === 'BOOKING' && (
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">เวลาจอง *</label>
               <DateTimeStepPicker
@@ -1052,7 +1052,7 @@ export default function BayBoardPage() {
             ไม่มีคิวจองในวันที่เลือก
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border-2 border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-2xl border-2 border-gray-200 bg-white">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>

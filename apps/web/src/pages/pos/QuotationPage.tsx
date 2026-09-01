@@ -433,7 +433,7 @@ export default function QuotationPage() {
       </div>
 
       {/* Plate + Notes + Email */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div>
           <label className="block text-sm font-medium mb-1">ทะเบียนรถ</label>
           <input

@@ -148,7 +148,7 @@ export default function StockReportPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'ยางรับเข้า',     value: summary.tiresIn,    unit: 'เส้น',    icon: '📥', cls: 'text-green-600' },
           { label: 'ปรับแต่งสต็อก', value: summary.adjustCount, unit: 'เส้น', icon: '✏️', cls: 'text-yellow-600' },
@@ -173,9 +173,9 @@ export default function StockReportPage() {
         <>
           <div className="bg-gray-50 rounded-xl p-4 mb-2">
           {/* Top row: ปรับแต่งสต็อก + ยางรับเข้า side by side */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
             {/* ปรับแต่งสต็อก */}
-            <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="bg-white rounded-xl border overflow-x-auto">
               <div className="px-4 py-3 border-b bg-yellow-50 flex items-center justify-between">
                 <span className="font-bold text-gray-800">✏️ ปรับแต่งสต็อก</span>
                 <span className="font-bold text-lg text-yellow-600">{byType.adjust.length > 0 ? `${byType.adjust.length} รายการ` : '—'}</span>
@@ -209,7 +209,7 @@ export default function StockReportPage() {
               )}
             </div>
             {/* ยางรับเข้า */}
-            <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="bg-white rounded-xl border overflow-x-auto">
               <div className="px-4 py-3 border-b bg-green-50 flex items-center justify-between">
                 <span className="font-bold text-gray-800">📥 ยางรับเข้า</span>
                 <span className="font-bold text-lg text-green-600">{byType.in.length > 0 ? `${byType.in.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
@@ -243,7 +243,7 @@ export default function StockReportPage() {
           </div>
 
           {/* ยางขายออก — full width below */}
-          <div className="bg-white rounded-xl border overflow-hidden mb-8">
+          <div className="bg-white rounded-xl border overflow-x-auto mb-8">
             <div className="px-4 py-3 border-b bg-red-50 flex items-center justify-between">
               <span className="font-bold text-gray-800">📤 ยางขายออก</span>
               <span className="font-bold text-lg text-red-500">{byType.out.length > 0 ? `${byType.out.reduce((s: number, m: any) => s + m.qty, 0)} เส้น` : '—'}</span>
@@ -279,7 +279,7 @@ export default function StockReportPage() {
 
           <div className="bg-gray-50 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">บันทึกการเคลื่อนไหวทั้งหมด</h3>
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
                 <tr>

@@ -333,7 +333,7 @@ export default function BillMatcherPage() {
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <p className="font-medium">นำเข้าแบตช์ใหม่</p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   ไฟล์บิล <span className="text-red-500">*</span>
@@ -422,7 +422,7 @@ export default function BillMatcherPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       เดือน (1-12)
@@ -582,7 +582,7 @@ export default function BillMatcherPage() {
             ช่วงราคาต่ำสุด-สูงสุด ใช้สำหรับให้อัลกอริทึมจับคู่อยู่ในช่วงนั้น
           </p>
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
