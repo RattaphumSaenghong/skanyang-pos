@@ -109,7 +109,8 @@ export default function BillMatcherPage() {
   });
 
   const deleteBatch = useMutation({
-    mutationFn: (id: string) => api.delete(`/bill-batches/${id}`),
+    mutationFn: (id: string) =>
+      api.delete(`/bill-batches/${id}?shopId=${effectiveShopId}`),
     onSuccess: (_data, deletedId) => {
       qc.invalidateQueries({ queryKey: ['bill-batches'] });
       if (selectedBatchId === deletedId) setSelectedBatchId(null);
