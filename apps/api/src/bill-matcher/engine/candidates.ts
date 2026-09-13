@@ -1,5 +1,5 @@
 import { archetypeFor } from './archetypes';
-import { MAX_CANDIDATES_PER_BILL, WEIGHTS } from './scoring';
+import { MAX_CANDIDATES_PER_BILL, PRICE_ADJUST, WEIGHTS } from './scoring';
 import { BillContext, GapCloser, contextKey, isTireCategory } from './services';
 import { MatchLine, PoolItemInput, ServiceFeeInput } from './types';
 
@@ -24,6 +24,8 @@ export interface Candidate {
   qty2: number;
   gap: number; // to be closed by service lines
   freeform: number; // baht no real line could absorb
+  /** Per-unit baht the real price drifted from the pool's listed price. */
+  priceAdjust: number;
   ctxKey: string;
 }
 
@@ -48,7 +50,7 @@ function scoreOf(
   if (item) {
     s += isTireCategory(item.category)
       ? (WEIGHTS.tireQtyBonus[qty] ?? -30)
-      : WEIGHTS.itemBonus;
+      : (WEIGHTS.itemQtyBonus[qty] ?? -30);
     s += Math.min(item.soldQty, WEIGHTS.soldDepthCap) * WEIGHTS.soldDepthBonus;
   }
   if (item2) s -= WEIGHTS.secondItemPenalty;
@@ -128,9 +130,11 @@ export class CandidateBuilder {
 
   /** A second SKU whose multiple lands within service reach of `residual`. */
   private findSecond(
+    primary: PoolItemInput,
     residual: number,
     maxSvc: number,
   ): { idx: number; qty: number; gap: number } | null {
+    const primaryIsTire = isTireCategory(primary.category);
     for (const q2 of [4, 2, 1]) {
       const hiPrice = Math.floor(residual / q2);
       const loPrice = Math.floor(Math.max(0, residual - maxSvc) / q2);
@@ -150,9 +154,25 @@ export class CandidateBuilder {
       for (let p = start; p >= 0 && this.sortedPrices[p] >= loPrice; p--) {
         for (const idx of this.byPrice.get(this.sortedPrices[p]) as number[]) {
           if (this.capacity[idx] < q2) continue;
+          const candidate = this.pool[idx];
+          // Same qty>2 rule as the primary item: only tyres sell in fours.
+          if (q2 > 2 && !isTireCategory(candidate.category)) continue;
+          // Two different tyres on one bill is a real thing only as a
+          // staggered-fitment set — same brand and model, different size.
+          // Real bills paired mismatched tyres in under 2% of cases, and
+          // always that way; anything else is the engine hallucinating a
+          // second set that was never bought.
+          if (primaryIsTire && isTireCategory(candidate.category)) {
+            if (
+              candidate.brand !== primary.brand ||
+              candidate.model !== primary.model
+            ) {
+              continue;
+            }
+          }
           const g = residual - q2 * this.sortedPrices[p];
           if (g < 0) continue;
-          if (this.closerFor(contextFor(this.pool[idx], q2)).covers(g)) {
+          if (this.closerFor(contextFor(candidate, q2)).covers(g)) {
             return { idx, qty: q2, gap: g };
           }
         }
@@ -174,9 +194,46 @@ export class CandidateBuilder {
       if (this.capacity[i] <= 0) continue;
       const item = this.pool[i];
 
-      for (const qty of arch.multiplicities) {
+      // Real bills put a non-tyre item at qty > 2 in under 1% of lines — tyres
+      // are the only goods this shop actually sells by the set of four.
+      const isTire = isTireCategory(item.category);
+      const multiplicities = isTire
+        ? arch.multiplicities
+        : arch.multiplicities.filter((q) => q <= 2);
+
+      for (const qty of multiplicities) {
         if (qty > this.capacity[i]) continue;
         const base = qty * item.unitPrice;
+
+        // A real negotiated price: this item's own line absorbs the drift
+        // instead of needing a filler line, as long as it's within haggling
+        // range. Checked before the `base > amount` guard below because a
+        // discount can put the real price under the listed one too.
+        const rawDelta = amount - base;
+        if (rawDelta !== 0 && rawDelta % qty === 0) {
+          const perUnit = rawDelta / qty;
+          const withinRange = isTire
+            ? Math.abs(perUnit) <= PRICE_ADJUST.tireMax &&
+              perUnit % PRICE_ADJUST.tireStep === 0
+            : Math.abs(perUnit) <= PRICE_ADJUST.otherMax;
+          if (withinRange) {
+            out.push({
+              score:
+                scoreOf(item, qty, null, 0, 0) -
+                Math.abs(perUnit) * WEIGHTS.priceAdjustPenalty,
+              units: qty,
+              itemIdx: i,
+              qty,
+              item2Idx: -1,
+              qty2: 0,
+              gap: 0,
+              freeform: 0,
+              priceAdjust: perUnit,
+              ctxKey: contextKey(contextFor(item, qty)),
+            });
+          }
+        }
+
         if (base > amount) continue;
 
         const ctx = contextFor(item, qty);
@@ -194,6 +251,7 @@ export class CandidateBuilder {
             qty2: 0,
             gap: 0,
             freeform: 0,
+            priceAdjust: 0,
             ctxKey: key,
           });
           continue;
@@ -209,12 +267,13 @@ export class CandidateBuilder {
             qty2: 0,
             gap,
             freeform: 0,
+            priceAdjust: 0,
             ctxKey: key,
           });
           continue;
         }
         if (arch.allowSecondItem) {
-          const found = this.findSecond(gap, closer.maxGap);
+          const found = this.findSecond(item, gap, closer.maxGap);
           if (found) {
             out.push({
               score: scoreOf(item, qty, this.pool[found.idx], 1, 0),
@@ -225,6 +284,7 @@ export class CandidateBuilder {
               qty2: found.qty,
               gap: found.gap,
               freeform: 0,
+              priceAdjust: 0,
               ctxKey: contextKey(contextFor(this.pool[found.idx], found.qty)),
             });
           }
@@ -241,6 +301,7 @@ export class CandidateBuilder {
             qty2: 0,
             gap: 0,
             freeform: gap,
+            priceAdjust: 0,
             ctxKey: key,
           });
         }
@@ -260,6 +321,7 @@ export class CandidateBuilder {
         qty2: 0,
         gap: amount,
         freeform: 0,
+        priceAdjust: 0,
         ctxKey: bareKey,
       });
     }
@@ -273,6 +335,7 @@ export class CandidateBuilder {
       qty2: 0,
       gap: 0,
       freeform: amount,
+      priceAdjust: 0,
       ctxKey: bareKey,
     });
 
@@ -290,19 +353,20 @@ export class CandidateBuilder {
   /** Turn a chosen candidate into the actual bill lines. */
   materialize(c: Candidate, amount: number): MatchLine[] {
     const lines: MatchLine[] = [];
-    const pushItem = (idx: number, qty: number) => {
+    const pushItem = (idx: number, qty: number, priceDelta = 0) => {
       const it = this.pool[idx];
+      const unitPrice = it.unitPrice + priceDelta;
       lines.push({
         kind: 'ITEM',
         poolItemId: it.id,
         description: describe(it),
         qty,
-        unitPrice: it.unitPrice,
-        lineTotal: qty * it.unitPrice,
+        unitPrice,
+        lineTotal: qty * unitPrice,
       });
     };
 
-    if (c.itemIdx >= 0) pushItem(c.itemIdx, c.qty);
+    if (c.itemIdx >= 0) pushItem(c.itemIdx, c.qty, c.priceAdjust);
     if (c.item2Idx >= 0) pushItem(c.item2Idx, c.qty2);
     if (c.gap > 0) {
       const svc = this.closers.get(c.ctxKey)?.lines(c.gap);

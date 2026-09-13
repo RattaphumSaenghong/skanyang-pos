@@ -242,6 +242,38 @@ describe('bill matcher engine', () => {
     checkInvariants(res, pool);
   });
 
+  it('lets a tyre price drift up to ±100 in 25-baht steps', () => {
+    const pool = [tire('t1', 4000, 40)];
+    // 4 tyres at 3,900 each (100 under list, the max allowed drift) = 15,600.
+    const res = match([bill(1, 15600)], pool, [], opts);
+
+    expect(res.bills[0].freeform).toBe(0);
+    const item = res.bills[0].lines.find((l) => l.kind === 'ITEM');
+    expect(item?.qty).toBe(4);
+    expect(item?.unitPrice).toBe(3900);
+    checkInvariants(res, pool);
+  });
+
+  it('does not adjust a tyre price by less than the 25-baht step', () => {
+    const pool = [tire('t1', 4000, 40)];
+    // 4 tyres would need -10/unit to land here — not a multiple of 25.
+    const res = match([bill(1, 15960)], pool, [], opts);
+
+    const item = res.bills[0].lines.find((l) => l.kind === 'ITEM');
+    expect(item?.unitPrice).not.toBe(3990);
+  });
+
+  it('lets a non-tyre part price drift up to ±50', () => {
+    const pool = [part('p1', 500, 10)];
+    // 2 units at 545 each (45 over list, within the ±50 allowance) = 1,090.
+    const res = match([bill(1, 1090)], pool, [], opts);
+
+    expect(res.bills[0].freeform).toBe(0);
+    const item = res.bills[0].lines.find((l) => l.kind === 'ITEM');
+    expect(item?.unitPrice).toBe(545);
+    checkInvariants(res, pool);
+  });
+
   it('bills a small amount as services only', () => {
     const pool = [tire('t1', 4000, 40)];
     const res = match([bill(1, 150)], pool, FEES, opts);

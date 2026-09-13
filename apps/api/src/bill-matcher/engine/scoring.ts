@@ -22,14 +22,22 @@ export const WEIGHTS = {
    */
   tireQtyBonus: { 1: 4, 2: 12, 4: 20 } as Record<number, number>,
 
-  /** Non-tyre goods have no natural pairing, so quantity carries no signal. */
-  itemBonus: 6,
+  /**
+   * Non-tyre goods overwhelmingly leave one at a time — a backtest against
+   * real historical bills found qty 1 in 84% of lines, qty 2 in 17%, and qty 4
+   * in under 1% (the odd bulk brake-pad or fleet oil order). Unlike tyres,
+   * quantity is a strong tell here, not noise.
+   */
+  itemQtyBonus: { 1: 10, 2: 4, 4: -30 } as Record<number, number>,
 
   /** Each extra service line makes the bill busier and less plausible. */
   serviceLinePenalty: 5,
 
   /** A second SKU is legitimate but should lose to a clean single-SKU basket. */
   secondItemPenalty: 14,
+
+  /** Per baht/unit the real price drifted from the pool's listed price. */
+  priceAdjustPenalty: 0.25,
 
   /**
    * Nudges allocation toward sold SKUs with several known units. The primary
@@ -40,6 +48,17 @@ export const WEIGHTS = {
 
   /** A bill nothing could be found for. Dwarfs every other term by design. */
   unmatchedPenalty: 500,
+};
+
+/**
+ * How far a line's real price may drift from the pool's listed price and
+ * still count as a clean single-item match rather than needing filler lines.
+ * Tyres are haggled over in round steps; everything else just varies a bit.
+ */
+export const PRICE_ADJUST = {
+  tireStep: 25,
+  tireMax: 100,
+  otherMax: 50,
 };
 
 /** Candidates kept per bill. Enough for the repair loop to have alternatives. */
