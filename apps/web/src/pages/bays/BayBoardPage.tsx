@@ -565,6 +565,7 @@ function AddJobModal({
 // ── Queue details overlay ───────────────────────────────────────────────────────
 
 interface QueueDetails {
+  id: string;
   plateNumber: string;
   customerName: string | null;
   phone: string | null;
@@ -576,7 +577,20 @@ interface QueueDetails {
   bayName: string | null;
 }
 
-function QueueDetailsOverlay({ data, onClose }: { data: QueueDetails; onClose: () => void }) {
+function QueueDetailsOverlay({
+  data,
+  onClose,
+  onSaveNote,
+  isSavingNote,
+}: {
+  data: QueueDetails;
+  onClose: () => void;
+  onSaveNote: (id: string, note: string) => void;
+  isSavingNote: boolean;
+}) {
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(data.note ?? '');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
@@ -611,9 +625,52 @@ function QueueDetailsOverlay({ data, onClose }: { data: QueueDetails; onClose: (
           </div>
         </div>
 
-        {data.note && (
-          <div className="mt-3 rounded-lg bg-gray-50 p-2 text-sm text-gray-600">{data.note}</div>
-        )}
+        <div className="mt-3">
+          {editingNote ? (
+            <>
+              <textarea
+                rows={2}
+                className="w-full resize-none rounded-lg border px-3 py-2 text-sm"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                placeholder="ไม่บังคับ"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => {
+                    onSaveNote(data.id, noteDraft);
+                    setEditingNote(false);
+                  }}
+                  disabled={isSavingNote}
+                  className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                >
+                  บันทึก
+                </button>
+                <button
+                  onClick={() => {
+                    setNoteDraft(data.note ?? '');
+                    setEditingNote(false);
+                  }}
+                  className="rounded-lg border px-3 py-1.5 text-xs text-gray-600"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {data.note && (
+                <div className="rounded-lg bg-gray-50 p-2 text-sm text-gray-600">{data.note}</div>
+              )}
+              <button
+                onClick={() => setEditingNote(true)}
+                className="mt-1 text-xs text-blue-600 hover:underline"
+              >
+                {data.note ? 'แก้ไขหมายเหตุ' : '+ เพิ่มหมายเหตุ'}
+              </button>
+            </>
+          )}
+        </div>
 
         <div className="mt-4">
           <p className="mb-1 text-xs font-medium text-gray-600">บริการ</p>
@@ -837,6 +894,18 @@ export default function BayBoardPage() {
     onError: (err: any) => setError(errMessage(err)),
   });
 
+  const updateNote = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) =>
+      api.patch(`/bay-jobs/${id}`, { note }, { params: scope }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['bay-bookings'] });
+      qc.invalidateQueries({ queryKey: ['bay-board'] });
+      setQueueDetails((prev) => (prev ? { ...prev, note: variables.note } : prev));
+      setError(null);
+    },
+    onError: (err: any) => setError(errMessage(err)),
+  });
+
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-400">กำลังโหลด...</div>;
   }
@@ -951,6 +1020,7 @@ export default function BayBoardPage() {
                     <button
                       onClick={() =>
                         setQueueDetails({
+                          id: job.id,
                           plateNumber: job.plateNumber,
                           customerName: job.customerName,
                           phone: job.phone,
@@ -1105,6 +1175,7 @@ export default function BayBoardPage() {
                       <button
                         onClick={() =>
                           setQueueDetails({
+                            id: b.id,
                             plateNumber: b.plateNumber,
                             customerName: b.customerName,
                             phone: b.phone,
@@ -1169,7 +1240,12 @@ export default function BayBoardPage() {
       )}
 
       {queueDetails && (
-        <QueueDetailsOverlay data={queueDetails} onClose={() => setQueueDetails(null)} />
+        <QueueDetailsOverlay
+          data={queueDetails}
+          onClose={() => setQueueDetails(null)}
+          onSaveNote={(id, note) => updateNote.mutate({ id, note })}
+          isSavingNote={updateNote.isPending}
+        />
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async search(q: string, role: 'OWNER' | 'STAFF', shopId?: string | null) {
+  async search(q: string, role: 'OWNER' | 'STAFF' | 'MOBILE', shopId?: string | null) {
     if (!shopId) return [];
     const activePriceList = await this.prisma.priceList.findFirst({ where: { shopId, isActive: true } });
     if (!activePriceList) return [];
@@ -56,7 +56,7 @@ export class ProductsService {
         priceCash: entry.priceCash,
         priceCard: entry.priceCard,
         priceZeroPct: entry.priceZeroPct,
-        priceBulk: entry.priceBulk,
+        ...(role !== 'MOBILE' ? { priceBulk: entry.priceBulk } : {}),
         discTradeIn: entry.discTradeIn,
         discCard: entry.discCard,
         discCash: entry.discCash,

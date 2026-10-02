@@ -55,7 +55,7 @@ export default function StockDashboardPage() {
   const user = useAuthStore((s) => s.user);
   const globalShopId = useAuthStore((s) => s.effectiveShopId());
   const isOwner = user?.role === 'OWNER';
-  const canEdit = user?.role !== 'STAFF'; // STAFF can view stock but not adjust it
+  const canEdit = user?.role !== 'STAFF' && user?.role !== 'MOBILE'; // STAFF/MOBILE can view stock but not adjust it
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>('today');

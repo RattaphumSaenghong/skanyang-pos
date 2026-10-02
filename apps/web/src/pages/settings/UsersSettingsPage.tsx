@@ -152,6 +152,7 @@ export default function UsersSettingsPage() {
                 <label className="block text-sm font-medium mb-1">บทบาท</label>
                 <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
                   <option value="STAFF">STAFF</option>
+                  <option value="MOBILE">MOBILE</option>
                   <option value="OWNER">OWNER</option>
                 </select>
               </div>

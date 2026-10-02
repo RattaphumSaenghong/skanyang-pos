@@ -24,6 +24,7 @@ export default function PosSearchPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isOwner = useAuthStore((s) => s.isOwner());
+  const isMobile = user?.role === 'MOBILE';
   const effectiveShopId = useAuthStore((s) => s.effectiveShopId());
   const [search, setSearch] = useState('');
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -146,7 +147,7 @@ export default function PosSearchPage() {
                 <th className="px-4 py-3 text-right">เงินสด</th>
                 <th className="px-4 py-3 text-right">บัตร</th>
                 <th className="px-4 py-3 text-right">0%</th>
-                <th className="px-4 py-3 text-right">ขายส่ง</th>
+                {!isMobile && <th className="px-4 py-3 text-right">ขายส่ง</th>}
                 <th className="px-4 py-3 text-right">ราคาหน้าร้าน</th>
                 {isOwner && <th className="px-4 py-3 text-right">ราคาต้นทุน</th>}
                 {isOwner && <th className="px-4 py-3 text-right">กำไร%</th>}
@@ -183,11 +184,13 @@ export default function PosSearchPage() {
                     <td className="px-4 py-3 text-right font-mono">{e.priceCash.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceCard.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">{e.priceZeroPct.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-mono text-purple-600">{e.priceBulk > 0 ? e.priceBulk.toLocaleString() : '—'}</td>
+                    {!isMobile && (
+                      <td className="px-4 py-3 text-right font-mono text-purple-600">{e.priceBulk > 0 ? e.priceBulk.toLocaleString() : '—'}</td>
+                    )}
                     <td className="px-4 py-3 text-right font-mono text-gray-400">{e.priceListed.toLocaleString()}</td>
                     {isOwner && (
                       <td className="px-4 py-3 text-right font-mono text-rose-600">
-                        {(e.costPromo ?? e.costNormal ?? 0).toLocaleString()}
+                        {(e.costNormal ?? 0).toLocaleString()}
                       </td>
                     )}
                     {isOwner && (

@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 export interface AuthUser {
   id: string;
   username: string;
-  role: 'OWNER' | 'SHOP_OWNER' | 'STAFF';
+  role: 'OWNER' | 'SHOP_OWNER' | 'STAFF' | 'MOBILE';
   shopId: string | null;
 }
 

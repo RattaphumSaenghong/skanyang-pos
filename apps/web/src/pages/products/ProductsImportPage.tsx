@@ -391,7 +391,7 @@ export default function ProductsImportPage() {
               </thead>
               <tbody className="divide-y">
                 {filteredEntries.map((e) => {
-                  const cost = e.costPromo ?? e.costNormal;
+                  const cost = e.costNormal;
                   const cashVal = parseFloat(getEditVal(e.id, 'priceCash', e.priceCash));
                   const liveMargin = cost > 0 ? ((cashVal - cost) / cost) * 100 : 0;
                   const warning = liveMargin < 5;

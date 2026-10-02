@@ -11,7 +11,7 @@ export class ProductsController {
   @Get('search')
   search(@Query('q') q: string, @Query('shopId') qShopId: string, @CurrentUser() user: any) {
     const elevated = user.role === 'OWNER' || user.role === 'SHOP_OWNER';
-    const role: 'OWNER' | 'STAFF' = elevated ? 'OWNER' : 'STAFF';
+    const role: 'OWNER' | 'STAFF' | 'MOBILE' = elevated ? 'OWNER' : user.role === 'MOBILE' ? 'MOBILE' : 'STAFF';
     const shopId = user.role === 'OWNER' ? (qShopId ?? user.shopId) : user.shopId;
     return this.products.search(q ?? '', role, shopId);
   }
