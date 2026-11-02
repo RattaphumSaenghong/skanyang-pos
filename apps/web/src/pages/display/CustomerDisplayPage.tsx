@@ -57,13 +57,13 @@ function promoTotal(item: QuotationItem, unitPrice: number): number | null {
   // qty counts sets when isSetPricing, tires otherwise. Floored, because the
   // discount is per complete set — 5 tires is one set and a spare, not 1.25 sets.
   const sets = item.isSetPricing ? item.qty : Math.floor(item.qty / 4);
-  // Agilis gets a flat 500-per-set discount at every rim size, not Michelin's rim-based discount.
+  // Agilis keeps its flat 500-per-set discount.
   if (model.includes('AGILIS')) {
     return total - sets * 500;
   }
   if (brand.includes('MICHELIN')) {
-    const perSet = item.product.sizeRim >= 17 ? 1000 : 500;
-    return total - sets * perSet;
+    const setPrice = item.isSetPricing ? unitPrice : unitPrice * 4;
+    return total - sets * setPrice * 0.06;
   }
   return total;
 }
